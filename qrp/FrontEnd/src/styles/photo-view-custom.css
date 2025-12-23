@@ -1,0 +1,20 @@
+/* Force show navigation arrows on desktop */
+.PhotoView-Slider__ArrowLeft,
+.PhotoView-Slider__ArrowRight {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Hide counter/banner */
+.PhotoView-Slider__BannerWrap {
+  display: none !important;
+}
+
+/* Hide arrows on mobile and tablet */
+@media (max-width: 1023px) {
+  .PhotoView-Slider__ArrowLeft,
+  .PhotoView-Slider__ArrowRight {
+    display: none !important;
+  }
+}
