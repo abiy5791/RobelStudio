@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { motion} from "framer-motion";
+import { useParams, Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Heart,
   MessageCircle,
@@ -8,16 +8,37 @@ import {
   Download,
   Archive,
 } from "lucide-react";
-import { getAlbum, createGuestMessage, downloadPhoto, downloadAlbumZip, togglePhotoLike } from "../services/api.js";
+import {
+  FiInstagram,
+  FiFacebook,
+  FiMail,
+  FiPhone,
+  FiMapPin,
+  FiSun,
+  FiMoon,
+} from "react-icons/fi";
+import { FaTiktok } from "react-icons/fa";
+import {
+  getAlbum,
+  createGuestMessage,
+  downloadPhoto,
+  downloadAlbumZip,
+  togglePhotoLike,
+} from "../services/api.js";
+import { fetchStudioData } from "../services/studioApi.js";
 import { getImageUrl } from "../utils/imageUtils.js";
 import ProgressiveImage from "../components/ProgressiveImage.jsx";
 import toast from "react-hot-toast";
 import { PhotoProvider, PhotoView } from "react-photo-view";
 import "react-photo-view/dist/react-photo-view.css";
 import "../styles/photo-view-custom.css";
-import { getTheme, getCategoryIcon, applyTheme, getThemeColors } from '../themes/categories';
-import ParticleSystem from '../components/ParticleSystem';
-
+import {
+  getTheme,
+  getCategoryIcon,
+  applyTheme,
+  getThemeColors,
+} from "../themes/categories";
+import ParticleSystem from "../components/ParticleSystem";
 
 export default function EnhancedAlbumPage() {
   const { slug } = useParams();
@@ -27,20 +48,31 @@ export default function EnhancedAlbumPage() {
   const [messageForm, setMessageForm] = useState({ name: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [studioData, setStudioData] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("album-theme");
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      return savedTheme === "dark" || (!savedTheme && prefersDark);
+    }
+    return false;
+  });
 
+  const theme = getTheme(album?.category || "weddings");
+  const isDark = isDarkMode;
+  const themeColors = getThemeColors(album?.category || "weddings", isDark);
+  const particleType =
+    {
+      weddings: "petals",
+      family: "memories",
+      celebrations: "confetti",
+      travel: "clouds",
+      special: "bokeh",
+      personal: "artistic",
+    }[album?.category] || "petals";
 
-  const theme = getTheme(album?.category || 'weddings');
-  const isDark = document.documentElement.classList.contains('dark');
-  const themeColors = getThemeColors(album?.category || 'weddings', isDark);
-  const particleType = {
-    weddings: 'petals',
-    family: 'memories', 
-    celebrations: 'confetti',
-    travel: 'clouds',
-    special: 'bokeh',
-    personal: 'artistic'
-  }[album?.category] || 'petals';
-  
   // Apply theme when album loads
   useEffect(() => {
     if (album?.category) {
@@ -74,51 +106,78 @@ export default function EnhancedAlbumPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    fetchStudioData()
+      .then((data) => setStudioData(data))
+      .catch((err) => console.error("Failed to load studio data:", err));
+  }, []);
+
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
+  const toggleTheme = () => {
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+
+    if (newDarkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("album-theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("album-theme", "light");
+    }
+  };
+
   const handlePhotoLike = async (photoId) => {
-    setAlbum(prev => ({
+    setAlbum((prev) => ({
       ...prev,
-      photos: prev.photos.map(photo => {
+      photos: prev.photos.map((photo) => {
         if (photo.id === photoId) {
           const newLiked = !photo.is_liked;
           return {
             ...photo,
             is_liked: newLiked,
-            likes_count: newLiked ? photo.likes_count + 1 : photo.likes_count - 1
+            likes_count: newLiked
+              ? photo.likes_count + 1
+              : photo.likes_count - 1,
           };
         }
         return photo;
-      })
+      }),
     }));
 
     try {
       const result = await togglePhotoLike(slug, photoId);
-      setAlbum(prev => ({
+      setAlbum((prev) => ({
         ...prev,
-        photos: prev.photos.map(photo => 
-          photo.id === photoId 
-            ? { ...photo, likes_count: result.likes_count, is_liked: result.liked }
+        photos: prev.photos.map((photo) =>
+          photo.id === photoId
+            ? {
+                ...photo,
+                likes_count: result.likes_count,
+                is_liked: result.liked,
+              }
             : photo
-        )
+        ),
       }));
     } catch (err) {
-      setAlbum(prev => ({
+      setAlbum((prev) => ({
         ...prev,
-        photos: prev.photos.map(photo => {
+        photos: prev.photos.map((photo) => {
           if (photo.id === photoId) {
             const revertLiked = !photo.is_liked;
             return {
               ...photo,
               is_liked: revertLiked,
-              likes_count: revertLiked ? photo.likes_count + 1 : photo.likes_count - 1
+              likes_count: revertLiked
+                ? photo.likes_count + 1
+                : photo.likes_count - 1,
             };
           }
           return photo;
-        })
+        }),
       }));
-      console.error('Failed to toggle like:', err);
-      toast.error('Failed to update like');
+      console.error("Failed to toggle like:", err);
+      toast.error("Failed to update like");
     }
   };
 
@@ -165,69 +224,114 @@ export default function EnhancedAlbumPage() {
     );
 
   return (
-    <div 
+    <div
       className="min-h-screen relative overflow-hidden"
       style={{
         background: themeColors.background,
       }}
     >
-      <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0, pointerEvents: 'none' }}>
-        <ParticleSystem type={particleType} count={50} category={album?.category || 'weddings'} />
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      >
+        <ParticleSystem
+          type={particleType}
+          count={50}
+          category={album?.category || "weddings"}
+        />
       </div>
-      
+
       {/* Decorative Background Elements */}
-      <div 
+      <div
         className="fixed inset-0 pointer-events-none overflow-hidden"
         style={{ zIndex: -1 }}
       >
-        <div 
-          className="animate-float" 
+        <div
+          className="animate-float"
           style={{
-            position: 'absolute',
-            top: '10%',
-            left: '5%',
-            width: '24rem',
-            height: '24rem',
-            borderRadius: '50%',
-            filter: 'blur(60px)',
+            position: "absolute",
+            top: "10%",
+            left: "5%",
+            width: "24rem",
+            height: "24rem",
+            borderRadius: "50%",
+            filter: "blur(60px)",
             background: `radial-gradient(circle, ${themeColors.primary}40, transparent)`,
-            opacity: 0.6
+            opacity: 0.6,
           }}
         />
         <div
           className="animate-float"
-          style={{ 
-            position: 'absolute',
-            top: '25%',
-            right: '5%',
-            width: '20rem',
-            height: '20rem',
-            borderRadius: '50%',
-            filter: 'blur(60px)',
+          style={{
+            position: "absolute",
+            top: "25%",
+            right: "5%",
+            width: "20rem",
+            height: "20rem",
+            borderRadius: "50%",
+            filter: "blur(60px)",
             background: `radial-gradient(circle, ${themeColors.accent}35, transparent)`,
-            animationDelay: '2s',
-            opacity: 0.5
+            animationDelay: "2s",
+            opacity: 0.5,
           }}
         />
         <div
           className="animate-float"
-          style={{ 
-            position: 'absolute',
-            bottom: '10%',
-            left: '30%',
-            width: '18rem',
-            height: '18rem',
-            borderRadius: '50%',
-            filter: 'blur(60px)',
+          style={{
+            position: "absolute",
+            bottom: "10%",
+            left: "30%",
+            width: "18rem",
+            height: "18rem",
+            borderRadius: "50%",
+            filter: "blur(60px)",
             background: `radial-gradient(circle, ${themeColors.primary}30, transparent)`,
-            animationDelay: '4s',
-            opacity: 0.4
+            animationDelay: "4s",
+            opacity: 0.4,
           }}
         />
       </div>
 
+      {/* Mini Navigation Bar */}
+      <motion.div
+        className="fixed top-4 left-4 right-4 z-50 flex items-center justify-between"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.3 }}
+      >
+        {/* Studio Branding */}
+        <Link to="/">
+          <div className="flex items-center gap-2 bg-black/20 backdrop-blur-sm rounded-full px-3 py-2 border border-white/10 hover:bg-black/30 transition-all duration-300 cursor-pointer">
+            <div className="w-6 h-6 bg-gradient-to-r from-pink-600 to-rose-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">
+              R
+            </div>
+            <span
+              className="text-xs font-medium text-white/80 hover:text-white transition-colors"
+              style={{ fontFamily: "'Kaushan Script', cursive" }}
+            >
+              Robel Studio
+            </span>
+          </div>
+        </Link>
+
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          className="w-10 h-10 bg-black/20 backdrop-blur-sm border border-white/10 rounded-full flex items-center justify-center text-white hover:bg-black/30 transition-all duration-300"
+        >
+          {isDarkMode ? <FiSun size={18} /> : <FiMoon size={18} />}
+        </button>
+      </motion.div>
+
       <motion.section
-        className="relative z-10 pt-24 md:pt-32 pb-8 px-4 md:px-6"
+        className="relative z-10 pt-20 md:pt-24 pb-8 px-4 md:px-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
@@ -241,16 +345,18 @@ export default function EnhancedAlbumPage() {
             transition={{ duration: 0.8, delay: 0.2 }}
           >
             <motion.div className="flex items-center justify-center gap-3 mb-4">
-              <span className="text-4xl md:text-6xl">{getCategoryIcon(album?.category)}</span>
+              <span className="text-4xl md:text-6xl">
+                {getCategoryIcon(album?.category)}
+              </span>
             </motion.div>
-            
+
             <motion.h1
               className="font-light mb-6 md:mb-8 tracking-wide"
               style={{
                 fontFamily: theme.fonts.display,
-                fontSize: 'clamp(2rem, 8vw, 4.5rem)',
+                fontSize: "clamp(2rem, 8vw, 4.5rem)",
                 color: themeColors.text,
-                textShadow: `0 2px 4px ${themeColors.primary}20`
+                textShadow: `0 2px 4px ${themeColors.primary}20`,
               }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -265,44 +371,54 @@ export default function EnhancedAlbumPage() {
               animate={{ scaleX: 1 }}
               transition={{ duration: 0.8, delay: 0.5 }}
             >
-              <div 
+              <div
                 className="w-12 md:w-20 h-px"
-                style={{ background: `linear-gradient(to right, transparent, ${theme.colors.primary})` }}
+                style={{
+                  background: `linear-gradient(to right, transparent, ${theme.colors.primary})`,
+                }}
               />
               <Heart
                 className="w-4 h-4 md:w-5 md:h-5"
                 style={{ color: theme.colors.primary }}
                 fill="currentColor"
               />
-              <div 
+              <div
                 className="w-12 md:w-20 h-px"
-                style={{ background: `linear-gradient(to left, transparent, ${theme.colors.primary})` }}
+                style={{
+                  background: `linear-gradient(to left, transparent, ${theme.colors.primary})`,
+                }}
               />
             </motion.div>
 
             <motion.p
               className="text-xl md:text-2xl italic mb-8 md:mb-10"
-              style={{ 
+              style={{
                 color: theme.colors.accent,
-                fontFamily: theme.fonts.serif
+                fontFamily: theme.fonts.serif,
               }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.6 }}
             >
-              {album?.category === 'weddings' ? 'A Love Story Captured' :
-               album?.category === 'family' ? 'Family Memories Preserved' :
-               album?.category === 'celebrations' ? 'Celebration Moments' :
-               album?.category === 'travel' ? 'Adventure Documented' :
-               album?.category === 'special' ? 'Special Moments Remembered' : 'Creative Journey Shared'}
+              {album?.category === "weddings"
+                ? "A Love Story Captured"
+                : album?.category === "family"
+                ? "Family Memories Preserved"
+                : album?.category === "celebrations"
+                ? "Celebration Moments"
+                : album?.category === "travel"
+                ? "Adventure Documented"
+                : album?.category === "special"
+                ? "Special Moments Remembered"
+                : "Creative Journey Shared"}
             </motion.p>
 
             {album?.description && (
               <motion.p
                 className="max-w-2xl mx-auto text-base md:text-lg leading-relaxed px-4 mb-8"
-                style={{ 
-                  color: isDark ? themeColors.text : themeColors.text + '90',
-                  fontFamily: theme.fonts.sans
+                style={{
+                  color: isDark ? themeColors.text : themeColors.text + "90",
+                  fontFamily: theme.fonts.sans,
                 }}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -346,20 +462,33 @@ export default function EnhancedAlbumPage() {
               transition={{ duration: 1, delay: 0.4 }}
             >
               {album?.photos?.map((photo, i) => {
-                const photoUrl = getImageUrl(typeof photo === 'string' ? photo : photo.url);
-                const thumbnailUrl = typeof photo === 'object' && photo.thumbnail_url ? getImageUrl(photo.thumbnail_url) : photoUrl;
-                const mediumUrl = typeof photo === 'object' && photo.medium_url ? getImageUrl(photo.medium_url) : photoUrl;
-                const photoId = typeof photo === 'object' ? photo.id : i;
-                const likesCount = typeof photo === 'object' ? photo.likes_count : 0;
-                const isLiked = typeof photo === 'object' ? photo.is_liked : false;
-                
+                const photoUrl = getImageUrl(
+                  typeof photo === "string" ? photo : photo.url
+                );
+                const thumbnailUrl =
+                  typeof photo === "object" && photo.thumbnail_url
+                    ? getImageUrl(photo.thumbnail_url)
+                    : photoUrl;
+                const mediumUrl =
+                  typeof photo === "object" && photo.medium_url
+                    ? getImageUrl(photo.medium_url)
+                    : photoUrl;
+                const photoId = typeof photo === "object" ? photo.id : i;
+                const likesCount =
+                  typeof photo === "object" ? photo.likes_count : 0;
+                const isLiked =
+                  typeof photo === "object" ? photo.is_liked : false;
+
                 return (
                   <motion.div
                     key={photoId}
                     className="magazine-item group relative"
                     initial={{ opacity: 0, y: 40 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: Math.min(0.1 * i, 0.6) }}
+                    transition={{
+                      duration: 0.8,
+                      delay: Math.min(0.1 * i, 0.6),
+                    }}
                     whileHover={{ y: -8 }}
                   >
                     <PhotoView src={photoUrl}>
@@ -372,14 +501,17 @@ export default function EnhancedAlbumPage() {
                         />
                       </div>
                     </PhotoView>
-                    
+
                     {likesCount > 0 && (
                       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1 text-white text-sm">
-                        <Heart className="w-3 h-3 text-rose-400" fill="currentColor" />
+                        <Heart
+                          className="w-3 h-3 text-rose-400"
+                          fill="currentColor"
+                        />
                         <span>{likesCount}</span>
                       </div>
                     )}
-                    
+
                     <motion.button
                       onClick={() => handlePhotoLike(photoId)}
                       className="absolute top-2 left-2 bg-white/20 backdrop-blur-md border border-white/30 rounded-full p-2 shadow-lg hover:bg-white/30 transition-all duration-300 opacity-0 group-hover:opacity-100 md:opacity-0 opacity-100 z-10"
@@ -390,12 +522,12 @@ export default function EnhancedAlbumPage() {
                     >
                       <Heart
                         className={`w-5 h-5 transition-colors duration-300 ${
-                          isLiked ? 'text-rose-500' : 'text-gray-400'
+                          isLiked ? "text-rose-500" : "text-gray-400"
                         }`}
-                        fill={isLiked ? 'currentColor' : 'none'}
+                        fill={isLiked ? "currentColor" : "none"}
                       />
                     </motion.button>
-                    
+
                     {album.allow_downloads && (
                       <motion.button
                         onClick={() => downloadPhoto(slug, i)}
@@ -430,42 +562,64 @@ export default function EnhancedAlbumPage() {
                   style={{ color: themeColors.accent }}
                 />
               </motion.div>
-              <h2 
+              <h2
                 className="text-3xl md:text-4xl lg:text-5xl font-semibold mb-4 md:mb-5"
                 style={{
                   fontFamily: theme.fonts.display,
-                  color: themeColors.text
+                  color: themeColors.text,
                 }}
               >
-                {album?.category === 'weddings' ? 'Leave Your Wishes' :
-                 album?.category === 'family' ? 'Share Your Thoughts' :
-                 album?.category === 'celebrations' ? 'Celebration Messages' :
-                 album?.category === 'travel' ? 'Travel Comments' :
-                 album?.category === 'special' ? 'Special Messages' : 'Creative Feedback'}
+                {album?.category === "weddings"
+                  ? "Leave Your Wishes"
+                  : album?.category === "family"
+                  ? "Share Your Thoughts"
+                  : album?.category === "celebrations"
+                  ? "Celebration Messages"
+                  : album?.category === "travel"
+                  ? "Travel Comments"
+                  : album?.category === "special"
+                  ? "Special Messages"
+                  : "Creative Feedback"}
               </h2>
               <div className="flex items-center justify-center gap-2 mb-4">
-                <div 
+                <div
                   className="w-8 h-px"
-                  style={{ background: `linear-gradient(to right, transparent, ${themeColors.primary})` }}
+                  style={{
+                    background: `linear-gradient(to right, transparent, ${themeColors.primary})`,
+                  }}
                 />
-                <Heart className="w-3 h-3" style={{ color: themeColors.primary }} fill="currentColor" />
-                <div 
+                <Heart
+                  className="w-3 h-3"
+                  style={{ color: themeColors.primary }}
+                  fill="currentColor"
+                />
+                <div
                   className="w-8 h-px"
-                  style={{ background: `linear-gradient(to left, transparent, ${themeColors.primary})` }}
+                  style={{
+                    background: `linear-gradient(to left, transparent, ${themeColors.primary})`,
+                  }}
                 />
               </div>
               <p
                 className="text-base md:text-lg px-4"
-                style={{ 
-                  color: isDark ? themeColors.text + 'CC' : themeColors.text + '99',
-                  fontFamily: theme.fonts.sans
+                style={{
+                  color: isDark
+                    ? themeColors.text + "CC"
+                    : themeColors.text + "99",
+                  fontFamily: theme.fonts.sans,
                 }}
               >
-                {album?.category === 'weddings' ? 'Share your love and congratulations with the happy couple' :
-                 album?.category === 'family' ? 'Share your thoughts about these precious family moments' :
-                 album?.category === 'celebrations' ? 'Leave your celebration wishes and memories' :
-                 album?.category === 'travel' ? 'Share your thoughts about this amazing journey' :
-                 album?.category === 'special' ? 'Leave your congratulations and well wishes' : 'Share your creative feedback and inspiration'}
+                {album?.category === "weddings"
+                  ? "Share your love and congratulations with the happy couple"
+                  : album?.category === "family"
+                  ? "Share your thoughts about these precious family moments"
+                  : album?.category === "celebrations"
+                  ? "Leave your celebration wishes and memories"
+                  : album?.category === "travel"
+                  ? "Share your thoughts about this amazing journey"
+                  : album?.category === "special"
+                  ? "Leave your congratulations and well wishes"
+                  : "Share your creative feedback and inspiration"}
               </p>
             </div>
 
@@ -479,9 +633,9 @@ export default function EnhancedAlbumPage() {
                 <div className="md:col-span-2">
                   <label
                     className="block text-sm font-semibold mb-2 flex items-center gap-2"
-                    style={{ 
+                    style={{
                       color: themeColors.text,
-                      fontFamily: theme.fonts.sans
+                      fontFamily: theme.fonts.sans,
                     }}
                   >
                     <Heart
@@ -506,12 +660,15 @@ export default function EnhancedAlbumPage() {
                 <div className="md:col-span-2">
                   <label
                     className="block text-sm font-semibold mb-2 flex items-center gap-2"
-                    style={{ 
+                    style={{
                       color: themeColors.text,
-                      fontFamily: theme.fonts.sans
+                      fontFamily: theme.fonts.sans,
                     }}
                   >
-                    <MessageCircle className="w-4 h-4" style={{ color: themeColors.accent }} />
+                    <MessageCircle
+                      className="w-4 h-4"
+                      style={{ color: themeColors.accent }}
+                    />
                     Your Message
                   </label>
                   <textarea
@@ -565,9 +722,9 @@ export default function EnhancedAlbumPage() {
                 >
                   <p
                     className="text-lg md:text-xl italic"
-                    style={{ 
+                    style={{
                       color: themeColors.accent,
-                      fontFamily: theme.fonts.serif
+                      fontFamily: theme.fonts.serif,
                     }}
                   >
                     {album.messages.length}{" "}
@@ -590,7 +747,7 @@ export default function EnhancedAlbumPage() {
                       className="w-12 h-12 rounded-full grid place-items-center font-semibold text-white shadow-md flex-shrink-0"
                       style={{
                         background: `linear-gradient(135deg, ${themeColors.primary} 0%, ${themeColors.accent} 100%)`,
-                        fontFamily: theme.fonts.serif
+                        fontFamily: theme.fonts.serif,
                       }}
                       whileHover={{ scale: 1.1, rotate: 5 }}
                     >
@@ -600,9 +757,9 @@ export default function EnhancedAlbumPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <div
                           className="font-semibold text-lg"
-                          style={{ 
+                          style={{
                             color: themeColors.text,
-                            fontFamily: theme.fonts.serif
+                            fontFamily: theme.fonts.serif,
                           }}
                         >
                           {msg.name}
@@ -615,9 +772,11 @@ export default function EnhancedAlbumPage() {
                       </div>
                       <div
                         className="text-sm flex items-center gap-2"
-                        style={{ 
-                          color: isDark ? themeColors.text + 'B3' : themeColors.text + '70',
-                          fontFamily: theme.fonts.sans
+                        style={{
+                          color: isDark
+                            ? themeColors.text + "B3"
+                            : themeColors.text + "70",
+                          fontFamily: theme.fonts.sans,
                         }}
                       >
                         <Calendar className="w-3 h-3" />
@@ -631,9 +790,11 @@ export default function EnhancedAlbumPage() {
                   </div>
                   <p
                     className="leading-relaxed text-base md:pl-16 pl-1"
-                    style={{ 
-                      color: isDark ? themeColors.text + 'CC' : themeColors.text + '80',
-                      fontFamily: theme.fonts.sans
+                    style={{
+                      color: isDark
+                        ? themeColors.text + "CC"
+                        : themeColors.text + "80",
+                      fontFamily: theme.fonts.sans,
                     }}
                   >
                     "{msg.message}"
@@ -642,10 +803,230 @@ export default function EnhancedAlbumPage() {
               ))}
             </div>
           </motion.div>
+
+          {/* Studio Contact Section */}
+          {studioData && (
+            <motion.div
+              className="mt-16 md:mt-32 max-w-4xl mx-auto relative"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 1.0 }}
+            >
+              <div className="text-center mb-8 md:mb-12">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: 0.5, delay: 1.1, type: "spring" }}
+                >
+                  <div className="inline-flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-pink-600 to-rose-600 rounded-xl flex items-center justify-center text-white font-bold text-xl">
+                      R
+                    </div>
+                    <span
+                      className="text-2xl md:text-3xl font-semibold"
+                      style={{
+                        fontFamily: "'Kaushan Script', cursive",
+                        background: `linear-gradient(135deg, ${themeColors.primary} 0%, ${themeColors.accent} 100%)`,
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                      }}
+                    >
+                      Robel Studio
+                    </span>
+                  </div>
+                </motion.div>
+                <h2
+                  className="text-2xl md:text-3xl font-semibold mb-4"
+                  style={{
+                    fontFamily: theme.fonts.display,
+                    color: themeColors.text,
+                  }}
+                >
+                  Create Your Own Beautiful Memories
+                </h2>
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  <div
+                    className="w-6 h-px"
+                    style={{
+                      background: `linear-gradient(to right, transparent, ${themeColors.primary})`,
+                    }}
+                  />
+                  <Heart
+                    className="w-3 h-3"
+                    style={{ color: themeColors.primary }}
+                    fill="currentColor"
+                  />
+                  <div
+                    className="w-6 h-px"
+                    style={{
+                      background: `linear-gradient(to left, transparent, ${themeColors.primary})`,
+                    }}
+                  />
+                </div>
+                <p
+                  className="text-base md:text-lg px-4"
+                  style={{
+                    color: isDark
+                      ? themeColors.text + "CC"
+                      : themeColors.text + "99",
+                    fontFamily: theme.fonts.sans,
+                  }}
+                >
+                  Professional photography services capturing life's precious
+                  moments
+                </p>
+              </div>
+
+              <motion.div
+                className="card-enhanced text-center"
+                whileHover={{ y: -4 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+                  <motion.a
+                    href="tel:+251911199762"
+                    className="flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl hover:bg-white/5 transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-600/20 rounded-xl flex items-center justify-center text-pink-400">
+                      <FiPhone size={18} />
+                    </div>
+                    <div className="text-center">
+                      <div
+                        className="font-semibold text-sm md:text-base"
+                        style={{
+                          color: themeColors.text,
+                          fontFamily: theme.fonts.sans,
+                        }}
+                      >
+                        Call Us
+                      </div>
+                      <div
+                        className="text-xs md:text-sm"
+                        style={{
+                          color: isDark
+                            ? themeColors.text + "B3"
+                            : themeColors.text + "70",
+                          fontFamily: theme.fonts.sans,
+                        }}
+                      >
+                        +251 911 199 762
+                      </div>
+                    </div>
+                  </motion.a>
+
+                  <motion.a
+                    href="mailto:robelasrat22@gmail.com"
+                    className="flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl hover:bg-white/5 transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-600/20 rounded-xl flex items-center justify-center text-pink-400">
+                      <FiMail size={18} />
+                    </div>
+                    <div className="text-center">
+                      <div
+                        className="font-semibold text-sm md:text-base"
+                        style={{
+                          color: themeColors.text,
+                          fontFamily: theme.fonts.sans,
+                        }}
+                      >
+                        Email Us
+                      </div>
+                      <div
+                        className="text-xs md:text-sm"
+                        style={{
+                          color: isDark
+                            ? themeColors.text + "B3"
+                            : themeColors.text + "70",
+                          fontFamily: theme.fonts.sans,
+                        }}
+                      >
+                        robelasrat22@gmail.com
+                      </div>
+                    </div>
+                  </motion.a>
+
+                  <motion.a
+                    href="https://maps.app.goo.gl/2vjswew27ztyZAy1A"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl hover:bg-white/5 transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-600/20 rounded-xl flex items-center justify-center text-pink-400">
+                      <FiMapPin size={18} />
+                    </div>
+                    <div className="text-center">
+                      <div
+                        className="font-semibold text-sm md:text-base"
+                        style={{
+                          color: themeColors.text,
+                          fontFamily: theme.fonts.sans,
+                        }}
+                      >
+                        Visit Us
+                      </div>
+                      <div
+                        className="text-xs md:text-sm"
+                        style={{
+                          color: isDark
+                            ? themeColors.text + "B3"
+                            : themeColors.text + "70",
+                          fontFamily: theme.fonts.sans,
+                        }}
+                      >
+                        Addis Ababa, Ethiopia
+                      </div>
+                    </div>
+                  </motion.a>
+                </div>
+
+                <div className="flex justify-center gap-3 md:gap-4">
+                  {[
+                    {
+                      Icon: FiInstagram,
+                      href: "https://www.instagram.com/robel_studioet/",
+                      label: "Instagram",
+                    },
+                    {
+                      Icon: FiFacebook,
+                      href: "https://web.facebook.com/robelstudiophotandvideo?_rdc=1&_rdr#",
+                      label: "Facebook",
+                    },
+                    {
+                      Icon: FaTiktok,
+                      href: "https://www.tiktok.com/@robelstudio",
+                      label: "TikTok",
+                    },
+                  ].map(({ Icon, href, label }) => (
+                    <motion.a
+                      key={label}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-10 h-10 md:w-12 md:h-12 rounded-full border flex items-center justify-center transition-all duration-300 hover:scale-110"
+                      style={{
+                        borderColor: themeColors.primary + "40",
+                        color: themeColors.primary,
+                        backgroundColor: themeColors.primary + "10",
+                      }}
+                      whileHover={{
+                        backgroundColor: themeColors.primary + "20",
+                        scale: 1.1,
+                      }}
+                      aria-label={label}
+                    >
+                      <Icon size={18} />
+                    </motion.a>
+                  ))}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
         </div>
       </motion.section>
-      
-
 
       {/* Back to Top Button */}
       {showBackToTop && (
@@ -664,10 +1045,7 @@ export default function EnhancedAlbumPage() {
           whileTap={{ scale: 0.9 }}
           transition={{ type: "spring", stiffness: 300 }}
         >
-          <Heart
-            className="w-6 h-6 md:w-7 md:h-7"
-            fill="currentColor"
-          />
+          <Heart className="w-6 h-6 md:w-7 md:h-7" fill="currentColor" />
         </motion.button>
       )}
     </div>

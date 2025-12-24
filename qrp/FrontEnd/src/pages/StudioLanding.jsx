@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   FiArrowRight,
   FiPlay,
@@ -38,6 +38,7 @@ import { FaTiktok } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchStudioData } from "../services/studioApi";
 import { formatNumber } from "../utils/numberUtils";
+import { validateAlbumId } from "../utils/albumUtils";
 
 // Generate fallback media items from portfolio
 const generateFallbackMedia = (portfolio) => {
@@ -93,13 +94,34 @@ export default function StudioLanding() {
   const [refreshing, setRefreshing] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    serviceType: '',
-    projectDetails: ''
+    fullName: "",
+    email: "",
+    phone: "",
+    serviceType: "",
+    projectDetails: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // QR Album Access
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const albumId = searchParams.get("album");
+  const [albumLoading, setAlbumLoading] = useState(false);
+
+  // Validate and sanitize album ID
+  const validAlbumId = validateAlbumId(albumId) ? albumId : null;
+
+  // Security: Clear invalid album parameter from URL
+  useEffect(() => {
+    if (albumId && !validAlbumId) {
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete("album");
+      const newUrl = `${window.location.pathname}${
+        newSearchParams.toString() ? "?" + newSearchParams.toString() : ""
+      }`;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [albumId, validAlbumId, searchParams]);
 
   // Icon mapping for services
   const iconMap = {
@@ -224,10 +246,10 @@ export default function StudioLanding() {
       const handleWheel = (e) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.5 : 0.5;
-        setPortfolioZoomLevel(prev => Math.max(1, Math.min(5, prev + delta)));
+        setPortfolioZoomLevel((prev) => Math.max(1, Math.min(5, prev + delta)));
       };
-      document.addEventListener('wheel', handleWheel, { passive: false });
-      return () => document.removeEventListener('wheel', handleWheel);
+      document.addEventListener("wheel", handleWheel, { passive: false });
+      return () => document.removeEventListener("wheel", handleWheel);
     }
   }, [selectedImage]);
 
@@ -236,43 +258,62 @@ export default function StudioLanding() {
       const handleWheel = (e) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.5 : 0.5;
-        setZoomLevel(prev => Math.max(1, Math.min(5, prev + delta)));
+        setZoomLevel((prev) => Math.max(1, Math.min(5, prev + delta)));
       };
-      document.addEventListener('wheel', handleWheel, { passive: false });
-      return () => document.removeEventListener('wheel', handleWheel);
+      document.addEventListener("wheel", handleWheel, { passive: false });
+      return () => document.removeEventListener("wheel", handleWheel);
     }
   }, [selectedServiceImage]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       // Simulate form submission
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // Reset form
       setFormData({
-        fullName: '',
-        email: '',
-        phone: '',
-        serviceType: '',
-        projectDetails: ''
+        fullName: "",
+        email: "",
+        phone: "",
+        serviceType: "",
+        projectDetails: "",
       });
-      
-      alert('Message sent successfully! We\'ll get back to you within 24 hours.');
+
+      alert(
+        "Message sent successfully! We'll get back to you within 24 hours."
+      );
     } catch (error) {
-      alert('Failed to send message. Please try again.');
+      alert("Failed to send message. Please try again.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleViewAlbum = async () => {
+    if (!validAlbumId || albumLoading) return;
+
+    setAlbumLoading(true);
+    try {
+      // Sanitize album ID for navigation with QR tracking
+      const sanitizedId = encodeURIComponent(validAlbumId);
+      navigate(`/albums/${sanitizedId}?from=qr`);
+    } catch (error) {
+      console.error("Navigation error:", error);
+      // Fallback: try direct URL construction
+      window.location.href = `/albums/${encodeURIComponent(validAlbumId)}?from=qr`;
+    } finally {
+      setAlbumLoading(false);
     }
   };
 
@@ -412,21 +453,22 @@ export default function StudioLanding() {
             <div className="flex items-center gap-3">
               {/* Actions */}
               <div className="hidden md:flex items-center gap-3">
-                {isAuthenticated ? (
-                  <Link
-                    to="/dashboard"
-                    className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
-                  >
-                    Dashboard
-                  </Link>
-                ) : (
-                  <Link
-                    to="/login"
-                    className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
-                  >
-                    Sign In
-                  </Link>
-                )}
+                {!validAlbumId &&
+                  (isAuthenticated ? (
+                    <Link
+                      to="/dashboard"
+                      className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/login"
+                      className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
+                    >
+                      Sign In
+                    </Link>
+                  ))}
               </div>
               <button
                 onClick={toggleTheme}
@@ -463,6 +505,21 @@ export default function StudioLanding() {
             }`}
           >
             <div className="px-4 sm:px-6 py-3 sm:py-4 space-y-2">
+              {/* QR Album Button - Mobile */}
+              {validAlbumId && (
+                <button
+                  onClick={() => {
+                    handleViewAlbum();
+                    setMobileMenuOpen(false);
+                  }}
+                  disabled={albumLoading}
+                  className="w-full text-left py-3 px-4 text-sm font-medium bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg hover:from-pink-700 hover:to-rose-700 transition-all duration-300 flex items-center gap-2 disabled:opacity-50"
+                >
+                  <FiImage size={16} />
+                  {albumLoading ? "Loading..." : "View Album"}
+                </button>
+              )}
+
               {[
                 { href: "#", label: "Home" },
                 { href: "#about", label: "About" },
@@ -483,7 +540,7 @@ export default function StudioLanding() {
                   {label}
                 </a>
               ))}
-              {!isAuthenticated && (
+              {!validAlbumId && !isAuthenticated && (
                 <Link
                   to="/login"
                   onClick={() => setMobileMenuOpen(false)}
@@ -499,6 +556,28 @@ export default function StudioLanding() {
 
       {/* Hero */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* QR Album Access - Desktop Header Banner */}
+        {validAlbumId && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="hidden md:block fixed top-20 left-1/2 -translate-x-1/2 z-40"
+          >
+            <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 ml-14 py-2 mt-4 rounded-full shadow-lg border border-white/20 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <FiImage size={16} />
+                <span className="text-sm font-medium">Album ready to view</span>
+                <button
+                  onClick={handleViewAlbum}
+                  disabled={albumLoading}
+                  className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {albumLoading ? "Loading..." : "View Now"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
         <div className="absolute inset-0 z-0">
           {currentMedia?.media_type === "image" ? (
             <img
@@ -523,6 +602,25 @@ export default function StudioLanding() {
 
         {/* Hero Content - Bottom */}
         <div className="absolute bottom-8 left-0 right-0 z-10 text-center px-4 max-w-4xl mx-auto">
+          {/* QR Album Access - Mobile Bottom Button */}
+          {validAlbumId && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="md:hidden mb-6"
+            >
+              <button
+                onClick={handleViewAlbum}
+                disabled={albumLoading}
+                className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center gap-3 mx-auto disabled:opacity-50 border-2 border-white/30"
+                aria-label="View Album"
+              >
+                <FiImage size={20} />
+                {albumLoading ? "Loading Album..." : "View Album"}
+                <FiArrowRight size={20} />
+              </button>
+            </motion.div>
+          )}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -539,10 +637,14 @@ export default function StudioLanding() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="text-xs sm:text-sm text-slate-300 mb-5 max-w-md mx-auto leading-relaxed"
+            className={`text-xs sm:text-sm mb-5 max-w-md mx-auto leading-relaxed ${
+              validAlbumId ? "text-pink-200" : "text-slate-300"
+            }`}
           >
-            {studioData.content?.hero_subtitle ||
-              "Professional photography services in Addis Ababa. Creating timeless memories with artistic vision and technical excellence."}
+            {validAlbumId
+              ? "Welcome! Your album is ready to view. Click the button above to access your photos."
+              : studioData.content?.hero_subtitle ||
+                "Professional photography services in Addis Ababa. Creating timeless memories with artistic vision and technical excellence."}
           </motion.p>
         </div>
 
@@ -1046,16 +1148,21 @@ export default function StudioLanding() {
                           />
                           <div
                             className={`absolute inset-0 bg-gradient-to-t via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 ${
-                              isDarkMode ? "from-slate-950/80" : "from-slate-900/70"
+                              isDarkMode
+                                ? "from-slate-950/80"
+                                : "from-slate-900/70"
                             }`}
                           >
                             <div className="absolute bottom-4 left-4 right-4">
                               <div className="flex items-center justify-between">
                                 <span className="text-white text-sm font-medium bg-slate-900/70 backdrop-blur-sm px-3 py-1 rounded-full">
-                                  {service.title.split(' ')[0]}
+                                  {service.title.split(" ")[0]}
                                 </span>
                                 <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                                  <FiMaximize2 size={14} className="text-white" />
+                                  <FiMaximize2
+                                    size={14}
+                                    className="text-white"
+                                  />
                                 </div>
                               </div>
                             </div>
@@ -1635,7 +1742,7 @@ export default function StudioLanding() {
                   className="w-full bg-gradient-to-r from-pink-600 to-rose-600 text-white py-4 px-8 rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-pink-600/25 transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   <FiSend size={18} />
-                  {isSubmitting ? 'Sending...' : 'Send Message'}
+                  {isSubmitting ? "Sending..." : "Send Message"}
                 </button>
               </form>
             </motion.div>
@@ -1833,7 +1940,9 @@ export default function StudioLanding() {
           {/* Zoom Display */}
           <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
             <div className="w-16 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
-              <span className="text-sm font-medium">{Math.round(portfolioZoomLevel * 100)}%</span>
+              <span className="text-sm font-medium">
+                {Math.round(portfolioZoomLevel * 100)}%
+              </span>
             </div>
           </div>
           {filteredImages.length > 1 && (
@@ -1868,7 +1977,10 @@ export default function StudioLanding() {
             onMouseDown={(e) => {
               if (portfolioZoomLevel > 1) {
                 setPortfolioIsDragging(true);
-                setPortfolioDragStart({ x: e.clientX - portfolioPanX, y: e.clientY - portfolioPanY });
+                setPortfolioDragStart({
+                  x: e.clientX - portfolioPanX,
+                  y: e.clientY - portfolioPanY,
+                });
               }
             }}
             onMouseMove={(e) => {
@@ -1879,7 +1991,14 @@ export default function StudioLanding() {
             }}
             onMouseUp={() => setPortfolioIsDragging(false)}
             onMouseLeave={() => setPortfolioIsDragging(false)}
-            style={{ cursor: portfolioZoomLevel > 1 ? (portfolioIsDragging ? 'grabbing' : 'grab') : 'default' }}
+            style={{
+              cursor:
+                portfolioZoomLevel > 1
+                  ? portfolioIsDragging
+                    ? "grabbing"
+                    : "grab"
+                  : "default",
+            }}
           >
             <img
               src={selectedImage}
@@ -1887,7 +2006,9 @@ export default function StudioLanding() {
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
               style={{
                 transform: `scale(${portfolioZoomLevel}) translate(${portfolioPanX}px, ${portfolioPanY}px)`,
-                transition: portfolioIsDragging ? 'none' : 'transform 0.3s ease'
+                transition: portfolioIsDragging
+                  ? "none"
+                  : "transform 0.3s ease",
               }}
             />
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md rounded-full px-4 py-2">
@@ -1934,9 +2055,7 @@ export default function StudioLanding() {
               </div>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] custom-scrollbar">
-              <motion.div
-                className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4"
-              >
+              <motion.div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
                 {selectedService.gallery_images.map((img, idx) => (
                   <motion.div
                     key={idx}
@@ -1981,10 +2100,20 @@ export default function StudioLanding() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4"
-          onClick={() => { setSelectedServiceImage(null); setZoomLevel(1); setPanX(0); setPanY(0); }}
+          onClick={() => {
+            setSelectedServiceImage(null);
+            setZoomLevel(1);
+            setPanX(0);
+            setPanY(0);
+          }}
         >
           <button
-            onClick={() => { setSelectedServiceImage(null); setZoomLevel(1); setPanX(0); setPanY(0); }}
+            onClick={() => {
+              setSelectedServiceImage(null);
+              setZoomLevel(1);
+              setPanX(0);
+              setPanY(0);
+            }}
             className="absolute top-6 right-6 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
           >
             <FiX size={20} />
@@ -1992,7 +2121,9 @@ export default function StudioLanding() {
           {/* Zoom Display */}
           <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
             <div className="w-16 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
-              <span className="text-sm font-medium">{Math.round(zoomLevel * 100)}%</span>
+              <span className="text-sm font-medium">
+                {Math.round(zoomLevel * 100)}%
+              </span>
             </div>
           </div>
           {selectedService && selectedService.gallery_images.length > 1 && (
@@ -2040,7 +2171,10 @@ export default function StudioLanding() {
             }}
             onMouseUp={() => setIsDragging(false)}
             onMouseLeave={() => setIsDragging(false)}
-            style={{ cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+            style={{
+              cursor:
+                zoomLevel > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+            }}
           >
             <img
               src={selectedServiceImage}
@@ -2048,7 +2182,7 @@ export default function StudioLanding() {
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
               style={{
                 transform: `scale(${zoomLevel}) translate(${panX}px, ${panY}px)`,
-                transition: isDragging ? 'none' : 'transform 0.3s ease'
+                transition: isDragging ? "none" : "transform 0.3s ease",
               }}
             />
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md rounded-full px-4 py-2">

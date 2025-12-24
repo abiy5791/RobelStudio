@@ -13,32 +13,47 @@ class GuestMessageSerializer(serializers.ModelSerializer):
 
 class AlbumListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for album lists"""
-    owner_username = serializers.CharField(source='owner.username', read_only=True)
+    owner_username = serializers.CharField(
+        source='owner.username', read_only=True)
     is_owner = serializers.SerializerMethodField(read_only=True)
     photo_count = serializers.SerializerMethodField(read_only=True)
     cover_photo = serializers.SerializerMethodField(read_only=True)
     url = serializers.SerializerMethodField(read_only=True)
-    
+
     class Meta:
         model = Album
         fields = [
-            'names', 'date', 'category', 'slug', 'url', 
+            'names', 'date', 'category', 'slug', 'url',
             'owner_username', 'is_owner', 'created_at',
             'photo_count', 'cover_photo'
         ]
-    
+
     def get_is_owner(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj.owner == request.user
         return False
-    
+
     def get_url(self, obj):
-        return f"{settings.FRONTEND_URL}/albums/{obj.slug}"
-    
+        # Return secure QR URL that goes to landing page with album parameter
+        from django.conf import settings
+        import urllib.parse
+
+        # Validate album slug/ID before generating URL
+        if not obj.slug:
+            return None
+
+        # Use landing page with album parameter for QR codes
+        base_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+
+        # URL encode the slug for security
+        encoded_slug = urllib.parse.quote(str(obj.slug), safe='')
+
+        return f"{base_url}/?albums={encoded_slug}"
+
     def get_photo_count(self, obj):
         return obj.photos.count()
-    
+
     def get_cover_photo(self, obj):
         request = self.context.get('request')
         photos = obj.photos.all()[:1]
@@ -53,21 +68,25 @@ class AlbumListSerializer(serializers.ModelSerializer):
 
 class AlbumSerializer(serializers.ModelSerializer):
     # Represent photos as a simple list of URLs (strings)
-    photos = serializers.ListField(child=serializers.JSONField(), write_only=True, required=False)
+    photos = serializers.ListField(
+        child=serializers.JSONField(), write_only=True, required=False)
     url = serializers.SerializerMethodField(read_only=True)
-    photos_out = serializers.SerializerMethodField(source='get_photos', read_only=True)
+    photos_out = serializers.SerializerMethodField(
+        source='get_photos', read_only=True)
     messages = GuestMessageSerializer(many=True, read_only=True)
-    owner_username = serializers.CharField(source='owner.username', read_only=True)
+    owner_username = serializers.CharField(
+        source='owner.username', read_only=True)
     is_owner = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Album
         fields = [
-            'names', 'date', 'description', 'category', 'slug', 'photos', 'photos_out', 
+            'names', 'date', 'description', 'category', 'slug', 'photos', 'photos_out',
             'url', 'messages', 'allow_downloads', 'owner_username', 'is_owner', 'created_at'
         ]
-        read_only_fields = ['slug', 'photos_out', 'url', 'messages', 'owner_username', 'is_owner', 'created_at']
-    
+        read_only_fields = ['slug', 'photos_out', 'url',
+                            'messages', 'owner_username', 'is_owner', 'created_at']
+
     def get_is_owner(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
@@ -75,26 +94,39 @@ class AlbumSerializer(serializers.ModelSerializer):
         return False
 
     def get_url(self, obj):
-        # Return full frontend URL for QR codes to work properly on mobile devices
-        return f"{settings.FRONTEND_URL}/albums/{obj.slug}"
+        # Return secure QR URL that goes to landing page with album parameter
+        from django.conf import settings
+        import urllib.parse
+
+        # Validate album slug/ID before generating URL
+        if not obj.slug:
+            return None
+
+        # Use landing page with album parameter for QR codes
+        base_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+
+        # URL encode the slug for security
+        encoded_slug = urllib.parse.quote(str(obj.slug), safe='')
+
+        return f"{base_url}/?album={encoded_slug}"
 
     def get_photos_out(self, obj):
         request = self.context.get('request')
         user_ip = self.get_client_ip(request) if request else None
-        
+
         # Prefetch likes to avoid N+1 queries
         photos = obj.photos.prefetch_related('likes').all()
-        
+
         # Get all liked photo IDs in one query
         liked_photo_ids = set()
         if user_ip:
             liked_photo_ids = set(
                 PhotoLike.objects.filter(
-                    photo__album=obj, 
+                    photo__album=obj,
                     ip_address=user_ip
                 ).values_list('photo_id', flat=True)
             )
-        
+
         photos_data = []
         for p in photos:
             photos_data.append({
@@ -108,7 +140,7 @@ class AlbumSerializer(serializers.ModelSerializer):
                 'height': p.height,
             })
         return photos_data
-    
+
     def get_client_ip(self, request):
         if not request:
             return None
@@ -128,7 +160,7 @@ class AlbumSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         photos_data = validated_data.pop('photos', [])
         album = Album.objects.create(**validated_data)
-        
+
         # Handle new format with thumbnail/medium URLs
         for idx, photo_data in enumerate(photos_data):
             if isinstance(photo_data, str):
@@ -137,35 +169,36 @@ class AlbumSerializer(serializers.ModelSerializer):
             else:
                 # New format: dict with url, thumbnail_url, medium_url
                 Photo.objects.create(
-                    album=album, 
-                    order=idx, 
+                    album=album,
+                    order=idx,
                     url=photo_data.get('url', photo_data),
                     thumbnail_url=photo_data.get('thumbnail_url', ''),
                     medium_url=photo_data.get('medium_url', ''),
                 )
         return album
-    
+
     def update(self, instance, validated_data):
         photos_data = validated_data.pop('photos', None)
-        
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-        
+
         if photos_data is not None:
             instance.photos.all().delete()
             for idx, photo_data in enumerate(photos_data):
                 if isinstance(photo_data, str):
-                    Photo.objects.create(album=instance, order=idx, url=photo_data)
+                    Photo.objects.create(
+                        album=instance, order=idx, url=photo_data)
                 else:
                     Photo.objects.create(
-                        album=instance, 
-                        order=idx, 
+                        album=instance,
+                        order=idx,
                         url=photo_data.get('url', photo_data),
                         thumbnail_url=photo_data.get('thumbnail_url', ''),
                         medium_url=photo_data.get('medium_url', ''),
                     )
-        
+
         return instance
 
 
@@ -177,11 +210,12 @@ class StudioStatSerializer(serializers.ModelSerializer):
 
 class StudioContentSerializer(serializers.ModelSerializer):
     stats = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = StudioContent
-        fields = ['hero_title', 'hero_subtitle', 'about_title', 'about_text', 'stats']
-    
+        fields = ['hero_title', 'hero_subtitle',
+                  'about_title', 'about_text', 'stats']
+
     def get_stats(self, obj):
         stats = obj.stats.all().order_by('order', 'id')
         return StudioStatSerializer(stats, many=True).data
@@ -207,13 +241,14 @@ class ServiceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Service
-        fields = ['id', 'title', 'description', 'icon', 'gallery_images', 'gallery_count', 'is_active']
+        fields = ['id', 'title', 'description', 'icon',
+                  'gallery_images', 'gallery_count', 'is_active']
 
     def get_gallery_images(self, obj):
         request = self.context.get('request')
         images = obj.gallery_images.filter().order_by('order')
         return [request.build_absolute_uri(img.image.url) if request else img.image.url for img in images]
-    
+
     def get_gallery_count(self, obj):
         return obj.gallery_images.count()
 
@@ -288,7 +323,7 @@ class PortfolioCategoryCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PortfolioCategory
         fields = ['name']
-        
+
     def validate_name(self, value):
         # Auto-generate slug from name
         return value.strip()
