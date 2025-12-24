@@ -82,7 +82,7 @@ export default function StudioLanding() {
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const [studioData, setStudioData] = useState({
     content: null,
     services: [],
@@ -540,14 +540,35 @@ export default function StudioLanding() {
                   {label}
                 </a>
               ))}
-              {!validAlbumId && !isAuthenticated && (
-                <Link
-                  to="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors"
-                >
-                  Sign In
-                </Link>
+              {!validAlbumId && (
+                isAuthenticated ? (
+                  <>
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors text-left w-full"
+                    >
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                )
               )}
             </div>
           </div>

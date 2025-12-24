@@ -307,7 +307,7 @@ export default function EnhancedAlbumPage() {
         transition={{ duration: 0.6, delay: 0.3 }}
       >
         {/* Studio Branding */}
-        <Link to="/">
+        <Link to={`/?album=${slug}`}>
           <div className="flex items-center gap-2 bg-black/20 backdrop-blur-sm rounded-full px-3 py-2 border border-white/10 hover:bg-black/30 transition-all duration-300 cursor-pointer">
             <div className="w-6 h-6 bg-gradient-to-r from-pink-600 to-rose-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">
               R
