@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Upload, X, Image } from 'lucide-react';
 
-const MultipleImageUpload = ({ onUpload, type = 'portfolio', categoryId, serviceId }) => {
+const MultipleImageUpload = ({ onUploadComplete, uploadFunction, categoryId, serviceId, acceptedTypes = "image/*", maxFiles = 50 }) => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [previews, setPreviews] = useState([]);
 
   const handleFileSelect = (e) => {
@@ -34,49 +35,62 @@ const MultipleImageUpload = ({ onUpload, type = 'portfolio', categoryId, service
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
-    const formData = new FormData();
-    
-    selectedFiles.forEach(file => {
-      formData.append('images', file);
-    });
-
-    if (type === 'portfolio' && categoryId) {
-      formData.append('category_id', categoryId);
-    } else if (type === 'service' && serviceId) {
-      formData.append('service_id', serviceId);
-    }
+    setUploadProgress(0);
 
     try {
-      const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
-      const endpoint = type === 'portfolio' ? `${API_BASE}/api/uploads/portfolio/` : `${API_BASE}/api/uploads/service/`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        onUpload?.(result);
-        
-        // Clear selections
-        setSelectedFiles([]);
-        setPreviews([]);
-        
-        // Clear file input
-        const fileInput = document.getElementById('multiple-file-input');
-        if (fileInput) fileInput.value = '';
+      // Use provided upload function if available, otherwise fallback to direct API call
+      let result;
+      if (uploadFunction) {
+        result = await uploadFunction(categoryId || serviceId, selectedFiles, (progress) => {
+          setUploadProgress(Math.min(progress, 90));
+        });
       } else {
-        const error = await response.json();
-        throw new Error(error.error || 'Upload failed');
+        // Fallback for backward compatibility
+        const formData = new FormData();
+        selectedFiles.forEach(file => {
+          formData.append('images', file);
+        });
+
+        if (categoryId) {
+          formData.append('category_id', categoryId);
+        } else if (serviceId) {
+          formData.append('service_id', serviceId);
+        }
+
+        const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+        const endpoint = categoryId ? `${API_BASE}/api/uploads/portfolio/` : `${API_BASE}/api/uploads/service/`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+        result = await response.json();
       }
+
+      setUploadProgress(100);
+      onUploadComplete?.(result);
+
+      // Clear selections
+      setSelectedFiles([]);
+      setPreviews([]);
+
+      // Clear file input
+      const fileInput = document.getElementById('multiple-file-input');
+      if (fileInput) fileInput.value = '';
+
     } catch (error) {
       console.error('Upload failed:', error);
       throw error;
     } finally {
       setUploading(false);
+      setTimeout(() => setUploadProgress(0), 1000);
     }
   };
 
@@ -87,7 +101,7 @@ const MultipleImageUpload = ({ onUpload, type = 'portfolio', categoryId, service
           id="multiple-file-input"
           type="file"
           multiple
-          accept="image/*"
+          accept={acceptedTypes}
           onChange={handleFileSelect}
           className="hidden"
         />
@@ -127,15 +141,39 @@ const MultipleImageUpload = ({ onUpload, type = 'portfolio', categoryId, service
 
       {selectedFiles.length > 0 && (
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">
+          <span className="text-sm" style={{ color: 'var(--text-soft)' }}>
             {selectedFiles.length} file(s) selected
           </span>
           <button
             onClick={handleUpload}
             disabled={uploading}
-            className="bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 rounded-lg font-medium transition-all duration-300 relative overflow-hidden"
+            style={{
+              background: 'var(--accent)',
+              color: 'white',
+            }}
           >
-            {uploading ? 'Uploading...' : 'Upload Images'}
+            {uploading && uploadProgress > 0 && (
+              <div
+                className="absolute inset-0 bg-white/20 transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            )}
+            {uploading ? (
+              <span className="flex items-center gap-2 relative z-10">
+                <div className="spinner" />
+                {uploadProgress > 0 && uploadProgress < 100
+                  ? `Uploading... ${uploadProgress}%`
+                  : uploadProgress === 100
+                  ? "Finalizing..."
+                  : "Uploading..."}
+              </span>
+            ) : (
+              <span className="flex items-center gap-2 relative z-10">
+                <Upload className="w-4 h-4" />
+                Upload Images
+              </span>
+            )}
           </button>
         </div>
       )}

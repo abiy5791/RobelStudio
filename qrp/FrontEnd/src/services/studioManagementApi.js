@@ -277,7 +277,7 @@ export async function bulkUploadPortfolioImages(categoryId, files, onProgress) {
 export async function bulkUploadServiceImages(serviceId, files, onProgress) {
   return new Promise((resolve, reject) => {
     const formData = new FormData()
-    formData.append('category_id', serviceId)
+    formData.append('service_id', serviceId)
     files.forEach(file => formData.append('images', file))
     
     const xhr = new XMLHttpRequest()

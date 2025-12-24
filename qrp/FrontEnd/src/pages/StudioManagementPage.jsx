@@ -25,6 +25,7 @@ export default function StudioManagementPage() {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('content')
   const [loading, setLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   // Content state
   const [content, setContent] = useState({
@@ -307,6 +308,8 @@ export default function StudioManagementPage() {
   }
 
   const handleMediaItemSave = async () => {
+    setLoading(true)
+    setUploadProgress(0)
     try {
       const formData = new FormData()
       formData.append('title', mediaForm.title)
@@ -315,12 +318,47 @@ export default function StudioManagementPage() {
         formData.append('file', mediaForm.file)
       }
 
-      await createMediaItem(formData)
+      // Use XHR for progress tracking
+      const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+      const token = localStorage.getItem('access_token')
+
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100)
+            setUploadProgress(percentComplete)
+          }
+        })
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve()
+          } else {
+            reject(new Error(`Upload failed (${xhr.status})`))
+          }
+        })
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Upload failed'))
+        })
+
+        xhr.open('POST', `${API_BASE}/api/manage/media-items/`)
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+        }
+        xhr.send(formData)
+      })
+
       toast.success('Media item added successfully')
       setMediaForm({ title: '', media_type: 'image', file: null })
       loadData()
     } catch (error) {
       toast.error(error.message)
+    } finally {
+      setLoading(false)
+      setTimeout(() => setUploadProgress(0), 1000)
     }
   }
 
@@ -595,13 +633,36 @@ export default function StudioManagementPage() {
 
               <motion.button
                 onClick={handleMediaItemSave}
-                disabled={!mediaForm.file}
-                className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 hover:shadow-lg hover:shadow-pink-600/25 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
-                whileHover={{ scale: !mediaForm.file ? 1 : 1.02 }}
-                whileTap={{ scale: !mediaForm.file ? 1 : 0.98 }}
+                disabled={!mediaForm.file || loading}
+                className="w-full px-4 py-3 rounded-lg text-base md:text-lg font-medium transition-all duration-300 relative overflow-hidden"
+                style={{
+                  background: 'var(--accent)',
+                  color: 'white',
+                }}
+                whileHover={{ scale: (!mediaForm.file || loading) ? 1 : 1.02 }}
+                whileTap={{ scale: (!mediaForm.file || loading) ? 1 : 0.98 }}
               >
-                <Plus className="w-4 h-4" />
-                Add Media Item
+                {loading && uploadProgress > 0 && (
+                  <div
+                    className="absolute inset-0 bg-white/20 transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                )}
+                {loading ? (
+                  <span className="flex items-center justify-center gap-3 relative z-10">
+                    <div className="spinner" />
+                    {uploadProgress > 0 && uploadProgress < 100
+                      ? `Uploading... ${uploadProgress}%`
+                      : uploadProgress === 100
+                      ? "Finalizing..."
+                      : "Uploading..."}
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-3 relative z-10">
+                    <Plus className="w-5 h-5" />
+                    Add Media Item
+                  </span>
+                )}
               </motion.button>
 
               {mediaItems.length > 0 && (
