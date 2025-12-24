@@ -15,8 +15,8 @@ import {
   getServices, createService, updateService, deleteService,
   getTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
   getPortfolioCategories, createPortfolioCategory, updatePortfolioCategory, deletePortfolioCategory,
-  getPortfolioImages, deletePortfolioImage,
-  getServiceGalleryImages, deleteServiceGalleryImage,
+  getPortfolioImages, deletePortfolioImage, updatePortfolioImage,
+  getServiceGalleryImages, deleteServiceGalleryImage, updateServiceGalleryImage,
   bulkUploadPortfolioImages, bulkUploadServiceImages,
   getMediaItems, createMediaItem, deleteMediaItem, updateMediaItem
 } from '../services/studioManagementApi'
@@ -1521,13 +1521,32 @@ export default function StudioManagementPage() {
                             e.preventDefault()
                             const dragIndex = parseInt(e.dataTransfer.getData('text/plain'))
                             if (dragIndex === index) return
-                            
+
                             const newImages = [...portfolioImages]
                             const draggedImage = newImages[dragIndex]
                             newImages.splice(dragIndex, 1)
                             newImages.splice(index, 0, draggedImage)
-                            setPortfolioImages(newImages)
-                            toast.success('Order updated successfully')
+
+                            // Update order values
+                            const updatedImages = newImages.map((img, idx) => ({
+                              ...img,
+                              order: idx
+                            }))
+
+                            setPortfolioImages(updatedImages)
+
+                            // Update database
+                            try {
+                              await Promise.all(
+                                updatedImages.map(img =>
+                                  updatePortfolioImage(img.id, { order: img.order })
+                                )
+                              )
+                              toast.success('Order updated successfully')
+                            } catch (error) {
+                              toast.error('Failed to update order')
+                              loadData() // Reload on error
+                            }
                           }}
                         >
                           <div className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -1657,13 +1676,32 @@ export default function StudioManagementPage() {
                               e.preventDefault()
                               const dragIndex = parseInt(e.dataTransfer.getData('text/plain'))
                               if (dragIndex === index) return
-                              
+
                               const newImages = [...serviceGalleryImages]
                               const draggedImage = newImages[dragIndex]
                               newImages.splice(dragIndex, 1)
                               newImages.splice(index, 0, draggedImage)
-                              setServiceGalleryImages(newImages)
-                              toast.success('Order updated successfully')
+
+                              // Update order values
+                              const updatedImages = newImages.map((img, idx) => ({
+                                ...img,
+                                order: idx
+                              }))
+
+                              setServiceGalleryImages(updatedImages)
+
+                              // Update database
+                              try {
+                                await Promise.all(
+                                  updatedImages.map(img =>
+                                    updateServiceGalleryImage(img.id, { order: img.order })
+                                  )
+                                )
+                                toast.success('Order updated successfully')
+                              } catch (error) {
+                                toast.error('Failed to update order')
+                                loadData() // Reload on error
+                              }
                             }}
                           >
                             <div className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">

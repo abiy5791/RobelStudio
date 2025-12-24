@@ -211,6 +211,16 @@ export async function deletePortfolioImage(id) {
   if (!res.ok) throw new Error('Failed to delete portfolio image')
 }
 
+export async function updatePortfolioImage(id, data) {
+  const res = await fetch(`${API_BASE}/api/manage/portfolio/${id}/`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error('Failed to update portfolio image')
+  return res.json()
+}
+
 // Service Gallery Management
 export async function getServiceGalleryImages(serviceId = null) {
   const params = serviceId ? `?service_id=${serviceId}` : ''
@@ -228,6 +238,16 @@ export async function deleteServiceGalleryImage(id) {
     headers: getAuthHeaders(),
   })
   if (!res.ok) throw new Error('Failed to delete service gallery image')
+}
+
+export async function updateServiceGalleryImage(id, data) {
+  const res = await fetch(`${API_BASE}/api/manage/service-gallery/${id}/`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error('Failed to update service gallery image')
+  return res.json()
 }
 
 // Bulk Upload Functions (reuse existing)

@@ -232,7 +232,7 @@ export default function StudioLanding() {
   }, [selectedImage]);
 
   useEffect(() => {
-    if (selectedService) {
+    if (selectedServiceImage) {
       const handleWheel = (e) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.5 : 0.5;
@@ -241,7 +241,7 @@ export default function StudioLanding() {
       document.addEventListener('wheel', handleWheel, { passive: false });
       return () => document.removeEventListener('wheel', handleWheel);
     }
-  }, [selectedService]);
+  }, [selectedServiceImage]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

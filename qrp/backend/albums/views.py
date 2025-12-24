@@ -541,13 +541,14 @@ class PortfolioImageManageView(generics.ListAPIView):
         return {'request': self.request}
 
 
-class PortfolioImageDetailManageView(generics.DestroyAPIView):
-    """Delete portfolio image"""
+class PortfolioImageDetailManageView(generics.RetrieveUpdateDestroyAPIView):
+    """Manage individual portfolio image"""
     permission_classes = [IsAuthenticated]
-    
+    serializer_class = PortfolioImageSerializer
+
     def get_queryset(self):
         return PortfolioImage.objects.all()
-    
+
     def perform_destroy(self, instance):
         instance.delete()
 
@@ -568,9 +569,10 @@ class ServiceGalleryImageManageView(generics.ListAPIView):
         return {'request': self.request}
 
 
-class ServiceGalleryImageDetailManageView(generics.DestroyAPIView):
-    """Delete service gallery image"""
+class ServiceGalleryImageDetailManageView(generics.RetrieveUpdateDestroyAPIView):
+    """Manage individual service gallery image"""
     permission_classes = [IsAuthenticated]
+    serializer_class = ServiceGalleryImageSerializer
     queryset = ServiceGalleryImage.objects.all()
 
 
