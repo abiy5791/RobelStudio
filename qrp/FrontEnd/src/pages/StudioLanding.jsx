@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   FiArrowRight,
@@ -58,6 +58,16 @@ export default function StudioLanding() {
   const [selectedService, setSelectedService] = useState(null);
   const [selectedServiceImage, setSelectedServiceImage] = useState(null);
   const [currentServiceImageIndex, setCurrentServiceImageIndex] = useState(0);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [portfolioZoomLevel, setPortfolioZoomLevel] = useState(1);
+  const [portfolioPanX, setPortfolioPanX] = useState(0);
+  const [portfolioPanY, setPortfolioPanY] = useState(0);
+  const [portfolioIsDragging, setPortfolioIsDragging] = useState(false);
+  const [portfolioDragStart, setPortfolioDragStart] = useState({ x: 0, y: 0 });
   const [currentTestimonialPage, setCurrentTestimonialPage] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
@@ -192,6 +202,47 @@ export default function StudioLanding() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const portfolioLightboxRef = useRef(null);
+  const serviceLightboxRef = useRef(null);
+
+  useEffect(() => {
+    if (zoomLevel <= 1) {
+      setPanX(0);
+      setPanY(0);
+    }
+  }, [zoomLevel]);
+
+  useEffect(() => {
+    if (portfolioZoomLevel <= 1) {
+      setPortfolioPanX(0);
+      setPortfolioPanY(0);
+    }
+  }, [portfolioZoomLevel]);
+
+  useEffect(() => {
+    if (selectedImage) {
+      const handleWheel = (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.5 : 0.5;
+        setPortfolioZoomLevel(prev => Math.max(1, Math.min(5, prev + delta)));
+      };
+      document.addEventListener('wheel', handleWheel, { passive: false });
+      return () => document.removeEventListener('wheel', handleWheel);
+    }
+  }, [selectedImage]);
+
+  useEffect(() => {
+    if (selectedService) {
+      const handleWheel = (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.5 : 0.5;
+        setZoomLevel(prev => Math.max(1, Math.min(5, prev + delta)));
+      };
+      document.addEventListener('wheel', handleWheel, { passive: false });
+      return () => document.removeEventListener('wheel', handleWheel);
+    }
+  }, [selectedService]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -241,12 +292,18 @@ export default function StudioLanding() {
   const openLightbox = (src, idx) => {
     setSelectedImage(src);
     setCurrentImageIndex(idx);
+    setPortfolioZoomLevel(1);
+    setPortfolioPanX(0);
+    setPortfolioPanY(0);
   };
 
   const nextImage = () => {
     const nextIdx = (currentImageIndex + 1) % filteredImages.length;
     setCurrentImageIndex(nextIdx);
     setSelectedImage(filteredImages[nextIdx]?.url);
+    setPortfolioZoomLevel(1);
+    setPortfolioPanX(0);
+    setPortfolioPanY(0);
   };
 
   const prevImage = () => {
@@ -254,11 +311,17 @@ export default function StudioLanding() {
       (currentImageIndex - 1 + filteredImages.length) % filteredImages.length;
     setCurrentImageIndex(prevIdx);
     setSelectedImage(filteredImages[prevIdx]?.url);
+    setPortfolioZoomLevel(1);
+    setPortfolioPanX(0);
+    setPortfolioPanY(0);
   };
 
   const openServiceLightbox = (img, idx, service) => {
     setSelectedServiceImage(img);
     setCurrentServiceImageIndex(idx);
+    setZoomLevel(1);
+    setPanX(0);
+    setPanY(0);
   };
 
   const nextServiceImage = () => {
@@ -267,6 +330,9 @@ export default function StudioLanding() {
       (currentServiceImageIndex + 1) % selectedService.gallery_images.length;
     setCurrentServiceImageIndex(nextIdx);
     setSelectedServiceImage(selectedService.gallery_images[nextIdx]);
+    setZoomLevel(1);
+    setPanX(0);
+    setPanY(0);
   };
 
   const prevServiceImage = () => {
@@ -276,6 +342,9 @@ export default function StudioLanding() {
       selectedService.gallery_images.length;
     setCurrentServiceImageIndex(prevIdx);
     setSelectedServiceImage(selectedService.gallery_images[prevIdx]);
+    setZoomLevel(1);
+    setPanX(0);
+    setPanY(0);
   };
 
   return (
@@ -692,9 +761,8 @@ export default function StudioLanding() {
                         <img
                           src={img.url}
                           alt={img.title || `Portfolio ${idx + 1}`}
-                          className={`w-full object-cover group-hover:scale-110 transition-transform duration-500 ${
-                            idx === 0 ? "h-48" : "h-32"
-                          }`}
+                          className="w-full h-auto object-cover group-hover:scale-110 transition-transform duration-500"
+                          loading="lazy"
                         />
                       </div>
                     ))}
@@ -712,9 +780,8 @@ export default function StudioLanding() {
                         <img
                           src={img.url}
                           alt={img.title || `Portfolio ${idx + 3}`}
-                          className={`w-full object-cover group-hover:scale-110 transition-transform duration-500 ${
-                            idx === 1 ? "h-48" : "h-32"
-                          }`}
+                          className="w-full h-auto object-cover group-hover:scale-110 transition-transform duration-500"
+                          loading="lazy"
                         />
                       </div>
                     ))}
@@ -953,44 +1020,49 @@ export default function StudioLanding() {
                       idx % 2 === 1 ? "lg:col-start-1 lg:row-start-1" : ""
                     }`}
                   >
-                    <div className="grid grid-cols-2 gap-4">
+                    <motion.div
+                      layout
+                      className="columns-1 sm:columns-2 gap-6 space-y-6"
+                    >
                       {service.gallery_images.slice(0, 4).map((img, imgIdx) => (
                         <motion.div
                           key={imgIdx}
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          whileInView={{ opacity: 1, scale: 1 }}
-                          viewport={{ once: true }}
+                          layout
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.5, delay: imgIdx * 0.1 }}
                           onClick={() => setSelectedService(service)}
-                          className={`relative overflow-hidden rounded-2xl cursor-pointer group border transition-all duration-300 hover:scale-105 ${
-                            imgIdx === 0 ? "col-span-2 h-64" : "h-32"
-                          } ${
+                          className={`group cursor-pointer relative overflow-hidden rounded-xl break-inside-avoid mb-6 transition-all duration-300 hover:scale-105 ${
                             isDarkMode
-                              ? "border-slate-700/50"
-                              : "border-slate-200/50 shadow-lg"
+                              ? "bg-slate-900/50 border border-slate-700/50"
+                              : "bg-white shadow-md hover:shadow-xl"
                           }`}
                         >
                           <img
                             src={img}
                             alt={`${service.title} ${imgIdx + 1}`}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            className="w-full h-auto object-cover transition-all duration-700 group-hover:scale-105"
+                            loading="lazy"
                           />
                           <div
-                            className={`absolute inset-0 bg-gradient-to-t via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
-                              isDarkMode
-                                ? "from-slate-950/60"
-                                : "from-slate-900/50"
+                            className={`absolute inset-0 bg-gradient-to-t via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 ${
+                              isDarkMode ? "from-slate-950/80" : "from-slate-900/70"
                             }`}
                           >
-                            <div className="absolute bottom-4 left-4">
-                              <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                                <FiImage size={14} className="text-white" />
+                            <div className="absolute bottom-4 left-4 right-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-white text-sm font-medium bg-slate-900/70 backdrop-blur-sm px-3 py-1 rounded-full">
+                                  {service.title.split(' ')[0]}
+                                </span>
+                                <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                                  <FiMaximize2 size={14} className="text-white" />
+                                </div>
                               </div>
                             </div>
                           </div>
                         </motion.div>
                       ))}
-                    </div>
+                    </motion.div>
                   </div>
                 </motion.div>
               );
@@ -1264,12 +1336,12 @@ export default function StudioLanding() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <a href="#contact">
-                  <button className="bg-white text-pink-600 px-8 py-4 rounded-full font-semibold flex items-center gap-2 hover:bg-white/90 transition-all duration-300 hover:scale-105">
+                  <button className="bg-white text-pink-600 px-8 py-4 rounded-full font-semibold hover:bg-white/90 transition-all duration-300 flex items-center gap-2 justify-center w-full sm:w-auto">
                     Book Session <FiArrowRight size={18} />
                   </button>
                 </a>
                 <Link to="/albums-app">
-                  <button className="border-2 border-white/30 text-white px-8 py-4 rounded-full font-semibold hover:bg-white/10 transition-all duration-300">
+                  <button className="border-2 border-white/30 text-white px-8 py-4 rounded-full font-semibold hover:bg-white/10 transition-all duration-300 w-full sm:w-auto">
                     QR Albums App
                   </button>
                 </Link>
@@ -1758,6 +1830,12 @@ export default function StudioLanding() {
           >
             <FiX size={20} />
           </button>
+          {/* Zoom Display */}
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
+            <div className="w-16 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
+              <span className="text-sm font-medium">{Math.round(portfolioZoomLevel * 100)}%</span>
+            </div>
+          </div>
           {filteredImages.length > 1 && (
             <>
               <button
@@ -1781,16 +1859,36 @@ export default function StudioLanding() {
             </>
           )}
           <motion.div
+            ref={portfolioLightboxRef}
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="relative w-full h-full max-w-6xl max-h-[85vh] mx-auto flex items-center justify-center"
+            className="relative w-full h-full max-w-6xl max-h-[85vh] mx-auto flex items-center justify-center overflow-hidden"
             onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              if (portfolioZoomLevel > 1) {
+                setPortfolioIsDragging(true);
+                setPortfolioDragStart({ x: e.clientX - portfolioPanX, y: e.clientY - portfolioPanY });
+              }
+            }}
+            onMouseMove={(e) => {
+              if (portfolioIsDragging && portfolioZoomLevel > 1) {
+                setPortfolioPanX(e.clientX - portfolioDragStart.x);
+                setPortfolioPanY(e.clientY - portfolioDragStart.y);
+              }
+            }}
+            onMouseUp={() => setPortfolioIsDragging(false)}
+            onMouseLeave={() => setPortfolioIsDragging(false)}
+            style={{ cursor: portfolioZoomLevel > 1 ? (portfolioIsDragging ? 'grabbing' : 'grab') : 'default' }}
           >
             <img
               src={selectedImage}
               alt="Portfolio fullscreen"
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+              style={{
+                transform: `scale(${portfolioZoomLevel}) translate(${portfolioPanX}px, ${portfolioPanY}px)`,
+                transition: portfolioIsDragging ? 'none' : 'transform 0.3s ease'
+              }}
             />
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md rounded-full px-4 py-2">
               <span className="text-white text-sm font-medium">
@@ -1836,11 +1934,16 @@ export default function StudioLanding() {
               </div>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] custom-scrollbar">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <motion.div
+                className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4"
+              >
                 {selectedService.gallery_images.map((img, idx) => (
-                  <div
+                  <motion.div
                     key={idx}
-                    className="group relative overflow-hidden rounded-xl cursor-pointer"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: idx * 0.1 }}
+                    className="group relative overflow-hidden rounded-xl cursor-pointer break-inside-avoid mb-4"
                     onClick={() =>
                       openServiceLightbox(img, idx, selectedService)
                     }
@@ -1848,7 +1951,8 @@ export default function StudioLanding() {
                     <img
                       src={img}
                       alt={`${selectedService.title} ${idx + 1}`}
-                      className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="w-full h-auto object-cover transition-all duration-700 group-hover:scale-105"
+                      loading="lazy"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <div className="absolute bottom-4 left-4">
@@ -1862,9 +1966,9 @@ export default function StudioLanding() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             </div>
           </motion.div>
         </motion.div>
@@ -1877,20 +1981,27 @@ export default function StudioLanding() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4"
-          onClick={() => setSelectedServiceImage(null)}
+          onClick={() => { setSelectedServiceImage(null); setZoomLevel(1); setPanX(0); setPanY(0); }}
         >
           <button
-            onClick={() => setSelectedServiceImage(null)}
+            onClick={() => { setSelectedServiceImage(null); setZoomLevel(1); setPanX(0); setPanY(0); }}
             className="absolute top-6 right-6 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
           >
             <FiX size={20} />
           </button>
+          {/* Zoom Display */}
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
+            <div className="w-16 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
+              <span className="text-sm font-medium">{Math.round(zoomLevel * 100)}%</span>
+            </div>
+          </div>
           {selectedService && selectedService.gallery_images.length > 1 && (
             <>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   prevServiceImage();
+                  setZoomLevel(1);
                 }}
                 className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
               >
@@ -1900,6 +2011,7 @@ export default function StudioLanding() {
                 onClick={(e) => {
                   e.stopPropagation();
                   nextServiceImage();
+                  setZoomLevel(1);
                 }}
                 className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
               >
@@ -1908,16 +2020,36 @@ export default function StudioLanding() {
             </>
           )}
           <motion.div
+            ref={serviceLightboxRef}
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="relative w-full h-full max-w-6xl max-h-[85vh] mx-auto flex items-center justify-center"
+            className="relative w-full h-full max-w-6xl max-h-[85vh] mx-auto flex items-center justify-center overflow-hidden"
             onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              if (zoomLevel > 1) {
+                setIsDragging(true);
+                setDragStart({ x: e.clientX - panX, y: e.clientY - panY });
+              }
+            }}
+            onMouseMove={(e) => {
+              if (isDragging && zoomLevel > 1) {
+                setPanX(e.clientX - dragStart.x);
+                setPanY(e.clientY - dragStart.y);
+              }
+            }}
+            onMouseUp={() => setIsDragging(false)}
+            onMouseLeave={() => setIsDragging(false)}
+            style={{ cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
           >
             <img
               src={selectedServiceImage}
               alt="Service gallery fullscreen"
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+              style={{
+                transform: `scale(${zoomLevel}) translate(${panX}px, ${panY}px)`,
+                transition: isDragging ? 'none' : 'transform 0.3s ease'
+              }}
             />
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md rounded-full px-4 py-2">
               <span className="text-white text-sm font-medium">
