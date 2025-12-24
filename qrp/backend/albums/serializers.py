@@ -49,7 +49,7 @@ class AlbumListSerializer(serializers.ModelSerializer):
         # URL encode the slug for security
         encoded_slug = urllib.parse.quote(str(obj.slug), safe='')
 
-        return f"{base_url}/?albums={encoded_slug}"
+        return f"{base_url}/?album={encoded_slug}"
 
     def get_photo_count(self, obj):
         return obj.photos.count()

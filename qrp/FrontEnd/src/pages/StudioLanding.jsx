@@ -105,7 +105,7 @@ export default function StudioLanding() {
   // QR Album Access
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const albumId = searchParams.get("album");
+  const albumId = searchParams.get("album") || searchParams.get("albums"); // Handle both parameters for compatibility
   const [albumLoading, setAlbumLoading] = useState(false);
 
   // Validate and sanitize album ID
@@ -113,9 +113,10 @@ export default function StudioLanding() {
 
   // Security: Clear invalid album parameter from URL
   useEffect(() => {
-    if (albumId && !validAlbumId) {
+    if ((albumId && !validAlbumId)) {
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.delete("album");
+      newSearchParams.delete("albums"); // Clean both parameters
       const newUrl = `${window.location.pathname}${
         newSearchParams.toString() ? "?" + newSearchParams.toString() : ""
       }`;
