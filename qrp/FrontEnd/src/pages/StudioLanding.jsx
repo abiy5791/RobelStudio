@@ -113,7 +113,7 @@ export default function StudioLanding() {
 
   // Security: Clear invalid album parameter from URL
   useEffect(() => {
-    if ((albumId && !validAlbumId)) {
+    if (albumId && !validAlbumId) {
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.delete("album");
       newSearchParams.delete("albums"); // Clean both parameters
@@ -312,7 +312,9 @@ export default function StudioLanding() {
     } catch (error) {
       console.error("Navigation error:", error);
       // Fallback: try direct URL construction
-      window.location.href = `/albums/${encodeURIComponent(validAlbumId)}?from=qr`;
+      window.location.href = `/albums/${encodeURIComponent(
+        validAlbumId
+      )}?from=qr`;
     } finally {
       setAlbumLoading(false);
     }
@@ -541,8 +543,8 @@ export default function StudioLanding() {
                   {label}
                 </a>
               ))}
-              {!validAlbumId && (
-                isAuthenticated ? (
+              {!validAlbumId &&
+                (isAuthenticated ? (
                   <>
                     <Link
                       to="/dashboard"
@@ -569,8 +571,7 @@ export default function StudioLanding() {
                   >
                     Sign In
                   </Link>
-                )
-              )}
+                ))}
             </div>
           </div>
         )}
@@ -589,6 +590,33 @@ export default function StudioLanding() {
               <div className="flex items-center gap-3">
                 <FiImage size={16} />
                 <span className="text-sm font-medium">Album ready to view</span>
+                <button
+                  onClick={handleViewAlbum}
+                  disabled={albumLoading}
+                  className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {albumLoading ? "Loading..." : "View Now"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* QR Album Access - Mobile Header Banner */}
+        {validAlbumId && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="md:hidden fixed top-20 left-1/2 -translate-x-1/2 z-40 w-4/5"
+          >
+            <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-3 py-2 mt-4 rounded-full shadow-lg border border-white/20 backdrop-blur-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <FiImage size={16} />
+                  <span className="text-sm font-medium">
+                    Album ready to View
+                  </span>
+                </div>
                 <button
                   onClick={handleViewAlbum}
                   disabled={albumLoading}
@@ -625,7 +653,7 @@ export default function StudioLanding() {
         {/* Hero Content - Bottom */}
         <div className="absolute bottom-8 left-0 right-0 z-10 text-center px-4 max-w-4xl mx-auto">
           {/* QR Album Access - Mobile Bottom Button */}
-          {validAlbumId && (
+          {/* {validAlbumId && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -642,7 +670,7 @@ export default function StudioLanding() {
                 <FiArrowRight size={20} />
               </button>
             </motion.div>
-          )}
+          )} */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
