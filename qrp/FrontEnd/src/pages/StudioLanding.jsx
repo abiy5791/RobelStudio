@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   FiArrowRight,
   FiPlay,
@@ -41,6 +41,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { fetchStudioData } from "../services/studioApi";
 
 import { formatNumber } from "../utils/numberUtils";
+import { sanitizeAlbumId, validateAlbumId } from "../utils/albumUtils";
 
 const SERVICE_ICON_MAP = {
   FiCamera,
@@ -191,6 +192,8 @@ const generateFallbackMedia = (portfolio) => {
 };
 
 export default function StudioLanding() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -251,6 +254,7 @@ export default function StudioLanding() {
   });
   const [formStatus, setFormStatus] = useState({ type: null, message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [albumLoading, setAlbumLoading] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth : 0
@@ -261,6 +265,21 @@ export default function StudioLanding() {
   const videoRef = useRef(null);
   const selectedVideoPlayerRef = useRef(null);
   const heroSectionRef = useRef(null);
+
+  const validAlbumId = useMemo(() => {
+    const searchKeys = ["album", "album_id", "slug"];
+    for (const key of searchKeys) {
+      const rawValue = searchParams.get(key);
+      if (!rawValue) {
+        continue;
+      }
+      const trimmedValue = rawValue.trim();
+      if (validateAlbumId(trimmedValue)) {
+        return trimmedValue;
+      }
+    }
+    return null;
+  }, [searchParams]);
 
   const fallbackMedia = useMemo(
     () => generateFallbackMedia(studioData.portfolio),
@@ -576,6 +595,18 @@ export default function StudioLanding() {
     await loadStudioData();
     setRefreshing(false);
   }, [loadStudioData]);
+
+  const handleViewAlbum = useCallback(() => {
+    if (!validAlbumId || albumLoading) {
+      return;
+    }
+    const sanitizedId = sanitizeAlbumId(validAlbumId);
+    if (!sanitizedId) {
+      return;
+    }
+    setAlbumLoading(true);
+    navigate(`/albums/${sanitizedId}`);
+  }, [albumLoading, navigate, validAlbumId]);
 
   useEffect(() => {
     loadStudioData();
