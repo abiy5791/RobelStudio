@@ -225,7 +225,7 @@ export default function StudioLanding() {
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const [studioData, setStudioData] = useState({
     content: null,
     services: [],
@@ -740,6 +740,11 @@ export default function StudioLanding() {
         phone: "",
         serviceType: "",
         projectDetails: "",
+        fullName: "",
+        email: "",
+        phone: "",
+        serviceType: "",
+        projectDetails: "",
       });
       setFormStatus({
         type: "success",
@@ -900,21 +905,22 @@ export default function StudioLanding() {
             <div className="flex items-center gap-3">
               {/* Actions */}
               <div className="hidden md:flex items-center gap-3">
-                {isAuthenticated ? (
-                  <Link
-                    to="/dashboard"
-                    className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
-                  >
-                    Dashboard
-                  </Link>
-                ) : (
-                  <Link
-                    to="/login"
-                    className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
-                  >
-                    Sign In
-                  </Link>
-                )}
+                {!validAlbumId &&
+                  (isAuthenticated ? (
+                    <Link
+                      to="/dashboard"
+                      className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/login"
+                      className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors"
+                    >
+                      Sign In
+                    </Link>
+                  ))}
               </div>
               <button
                 onClick={toggleTheme}
@@ -951,6 +957,21 @@ export default function StudioLanding() {
             }`}
           >
             <div className="px-4 sm:px-6 py-3 sm:py-4 space-y-2">
+              {/* QR Album Button - Mobile */}
+              {validAlbumId && (
+                <button
+                  onClick={() => {
+                    handleViewAlbum();
+                    setMobileMenuOpen(false);
+                  }}
+                  disabled={albumLoading}
+                  className="w-full text-left py-3 px-4 text-sm font-medium bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg hover:from-pink-700 hover:to-rose-700 transition-all duration-300 flex items-center gap-2 disabled:opacity-50"
+                >
+                  <FiImage size={16} />
+                  {albumLoading ? "Loading..." : "View Album"}
+                </button>
+              )}
+
               {[
                 { href: "#", label: "Home" },
                 { href: "#about", label: "About" },
@@ -971,15 +992,35 @@ export default function StudioLanding() {
                   {label}
                 </a>
               ))}
-              {!isAuthenticated && (
-                <Link
-                  to="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors"
-                >
-                  Sign In
-                </Link>
-              )}
+              {!validAlbumId &&
+                (isAuthenticated ? (
+                  <>
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors text-left w-full"
+                    >
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                ))}
             </div>
           </div>
         )}
@@ -1086,6 +1127,25 @@ export default function StudioLanding() {
 
         {/* Hero Content - Bottom */}
         <div className="absolute bottom-8 left-0 right-0 z-10 text-center px-4 max-w-4xl mx-auto">
+          {/* QR Album Access - Mobile Bottom Button */}
+          {/* {validAlbumId && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="md:hidden mb-6"
+            >
+              <button
+                onClick={handleViewAlbum}
+                disabled={albumLoading}
+                className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center gap-3 mx-auto disabled:opacity-50 border-2 border-white/30"
+                aria-label="View Album"
+              >
+                <FiImage size={20} />
+                {albumLoading ? "Loading Album..." : "View Album"}
+                <FiArrowRight size={20} />
+              </button>
+            </motion.div>
+          )} */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1102,10 +1162,14 @@ export default function StudioLanding() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="text-xs sm:text-sm text-slate-300 mb-5 max-w-md mx-auto leading-relaxed"
+            className={`text-xs sm:text-sm mb-5 max-w-md mx-auto leading-relaxed ${
+              validAlbumId ? "text-pink-200" : "text-slate-300"
+            }`}
           >
-            {studioData.content?.hero_subtitle ||
-              "Professional photography services in Addis Ababa. Creating timeless memories with artistic vision and technical excellence."}
+            {validAlbumId
+              ? "Welcome! Your album is ready to view. Click the button above to access your photos."
+              : studioData.content?.hero_subtitle ||
+                "Professional photography services in Addis Ababa. Creating timeless memories with artistic vision and technical excellence."}
           </motion.p>
         </div>
 

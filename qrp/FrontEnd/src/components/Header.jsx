@@ -89,19 +89,26 @@ export default function Header({ dark, toggleTheme }) {
               {/* Actions */}
               <div className="hidden md:flex items-center gap-3">
                 {isAuthenticated ? (
-                  <Link
-                    to="/dashboard"
-                    className="bg-pink-600 text-white px-2 lg:px-3 xl:px-4 py-1.5 lg:py-2 rounded-lg text-xs lg:text-sm font-medium hover:bg-pink-700 transition-colors"
-                  >
-                    <span>Dashboard</span>
-                  </Link>
+                  <>
+                    <Link
+                      to="/dashboard"
+                      className="bg-pink-600 text-white px-2 lg:px-3 xl:px-4 py-1.5 lg:py-2 rounded-lg text-xs lg:text-sm font-medium hover:bg-pink-700 transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+                    <button
+                      onClick={logout}
+                      className="bg-gray-600 text-white px-2 lg:px-3 xl:px-4 py-1.5 lg:py-2 rounded-lg text-xs lg:text-sm font-medium hover:bg-gray-700 transition-colors"
+                    >
+                      Logout
+                    </button>
+                  </>
                 ) : (
                   <Link
                     to="/login"
                     className="bg-pink-600 text-white px-2 lg:px-3 xl:px-4 py-1.5 lg:py-2 rounded-lg text-xs lg:text-sm font-medium hover:bg-pink-700 transition-colors"
                   >
-                    <span className="hidden lg:inline">Sign In</span>
-                    <span className="lg:hidden">Login</span>
+                    Sign In
                   </Link>
                 )}
               </div>
@@ -175,6 +182,26 @@ export default function Header({ dark, toggleTheme }) {
                 >
                   Sign In
                 </Link>
+              )}
+              {isAuthenticated && (
+                <>
+                  <Link
+                    to="/dashboard"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block py-2.5 px-3 rounded-lg text-sm font-medium bg-pink-600 text-white hover:bg-pink-700 transition-colors text-center"
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsMenuOpen(false);
+                    }}
+                    className="block w-full py-2.5 px-3 rounded-lg text-sm font-medium bg-gray-600 text-white hover:bg-gray-700 transition-colors text-center"
+                  >
+                    Logout
+                  </button>
+                </>
               )}
             </div>
           </div>
