@@ -1,21 +1,31 @@
-import React, { useState } from 'react';
-import { Upload, X, Image } from 'lucide-react';
+import React, { useId, useRef, useState } from 'react';
+import { Upload, X } from 'lucide-react';
 
 const MultipleImageUpload = ({ onUploadComplete, uploadFunction, categoryId, serviceId, acceptedTypes = "image/*", maxFiles = 50 }) => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [previews, setPreviews] = useState([]);
+  const [statusMessage, setStatusMessage] = useState("");
+  const inputId = useId();
+  const inputRef = useRef(null);
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
-    setSelectedFiles(files);
+    const limitedFiles = files.slice(0, maxFiles);
+    if (files.length > maxFiles) {
+      setStatusMessage(`Only the first ${maxFiles} files were added.`);
+    } else {
+      setStatusMessage("");
+    }
+    setSelectedFiles(limitedFiles);
     
     // Create previews
-    const newPreviews = files.map(file => ({
+    const newPreviews = limitedFiles.map(file => ({
       file,
       url: URL.createObjectURL(file),
-      name: file.name
+      name: file.name,
+      type: file.type
     }));
     setPreviews(newPreviews);
   };
@@ -29,6 +39,9 @@ const MultipleImageUpload = ({ onUploadComplete, uploadFunction, categoryId, ser
     
     setSelectedFiles(newFiles);
     setPreviews(newPreviews);
+    if (statusMessage && newFiles.length < maxFiles) {
+      setStatusMessage("");
+    }
   };
 
   const handleUpload = async () => {
@@ -36,6 +49,7 @@ const MultipleImageUpload = ({ onUploadComplete, uploadFunction, categoryId, ser
 
     setUploading(true);
     setUploadProgress(0);
+    setStatusMessage("");
 
     try {
       // Use provided upload function if available, otherwise fallback to direct API call
@@ -79,11 +93,13 @@ const MultipleImageUpload = ({ onUploadComplete, uploadFunction, categoryId, ser
 
       // Clear selections
       setSelectedFiles([]);
+      previews.forEach((preview) => URL.revokeObjectURL(preview.url));
       setPreviews([]);
 
       // Clear file input
-      const fileInput = document.getElementById('multiple-file-input');
-      if (fileInput) fileInput.value = '';
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
 
     } catch (error) {
       console.error('Upload failed:', error);
@@ -98,7 +114,8 @@ const MultipleImageUpload = ({ onUploadComplete, uploadFunction, categoryId, ser
     <div className="space-y-4">
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
         <input
-          id="multiple-file-input"
+          id={inputId}
+          ref={inputRef}
           type="file"
           multiple
           accept={acceptedTypes}
@@ -106,25 +123,39 @@ const MultipleImageUpload = ({ onUploadComplete, uploadFunction, categoryId, ser
           className="hidden"
         />
         <label
-          htmlFor="multiple-file-input"
+          htmlFor={inputId}
           className="cursor-pointer flex flex-col items-center space-y-2"
         >
           <Upload className="w-12 h-12 text-gray-400" />
           <span className="text-sm text-gray-600">
-            Click to select multiple images or drag and drop
+            Click to add up to {maxFiles} file{maxFiles === 1 ? '' : 's'} or drag and drop
           </span>
         </label>
       </div>
+
+      {statusMessage && (
+        <p className="text-sm text-rose-500">{statusMessage}</p>
+      )}
 
       {previews.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {previews.map((preview, index) => (
             <div key={index} className="relative group">
-              <img
-                src={preview.url}
-                alt={preview.name}
-                className="w-full h-24 object-cover rounded-lg"
-              />
+              {preview.type && preview.type.startsWith('video/') ? (
+                <video
+                  src={preview.url}
+                  className="w-full h-24 object-cover rounded-lg"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+              ) : (
+                <img
+                  src={preview.url}
+                  alt={preview.name}
+                  className="w-full h-24 object-cover rounded-lg"
+                />
+              )}
               <button
                 onClick={() => removeFile(index)}
                 className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"

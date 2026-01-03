@@ -1,6 +1,22 @@
 from django.contrib import admin
 from django import forms
-from .models import Album, Photo, GuestMessage, StudioContent, Service, Testimonial, PortfolioImage, ServiceGalleryImage, PortfolioCategory, MediaItem, StudioStat
+from .models import (
+    Album,
+    Photo,
+    GuestMessage,
+    StudioContent,
+    Service,
+    Testimonial,
+    PortfolioImage,
+    ServiceGalleryImage,
+    PortfolioCategory,
+    MediaItem,
+    StudioStat,
+    VideoCategory,
+    Video,
+    StudioContactInfo,
+    SocialLink,
+)
 
 class PhotoInline(admin.TabularInline):
     model = Photo
@@ -93,3 +109,49 @@ class StudioStatAdmin(admin.ModelAdmin):
     list_filter = ('is_active',)
     list_editable = ('order', 'is_active')
     search_fields = ('label', 'value')
+
+
+class SocialLinkInline(admin.TabularInline):
+    model = SocialLink
+    extra = 1
+    fields = ('platform', 'icon', 'url', 'order', 'is_active')
+
+
+@admin.register(StudioContactInfo)
+class StudioContactInfoAdmin(admin.ModelAdmin):
+    list_display = ('phone', 'email', 'is_active', 'updated_at')
+    list_filter = ('is_active',)
+    search_fields = ('phone', 'email', 'address')
+    inlines = [SocialLinkInline]
+
+
+@admin.register(SocialLink)
+class SocialLinkAdmin(admin.ModelAdmin):
+    list_display = ('platform', 'url', 'order', 'is_active')
+    list_filter = ('is_active',)
+    list_editable = ('order', 'is_active')
+    search_fields = ('platform', 'url')
+
+
+class VideoInline(admin.TabularInline):
+    model = Video
+    extra = 0
+    fields = ('title', 'video_file', 'order', 'is_active')
+
+
+@admin.register(VideoCategory)
+class VideoCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'order', 'is_active')
+    list_filter = ('is_active',)
+    list_editable = ('order', 'is_active')
+    search_fields = ('name',)
+    prepopulated_fields = {'slug': ('name',)}
+    inlines = [VideoInline]
+
+
+@admin.register(Video)
+class VideoAdmin(admin.ModelAdmin):
+    list_display = ('title', 'category', 'duration', 'year', 'order', 'is_active')
+    list_filter = ('category', 'is_active', 'year')
+    list_editable = ('order', 'is_active')
+    search_fields = ('title', 'description')

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   FiArrowRight,
@@ -27,21 +27,162 @@ import {
   FiClock,
   FiImage,
   FiMoon,
-  FiChevronDown,
-  FiChevronUp,
+  FiMenu,
+  FiCalendar,
+  FiEye,
+  FiLink,
+  FiGlobe,
   FiTwitter,
   FiLinkedin,
-  FiMap,
-  FiMenu,
+  FiAlertTriangle,
 } from "react-icons/fi";
-import { FaTiktok } from "react-icons/fa";
+import { FaTiktok, FaWhatsapp, FaYoutube } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchStudioData } from "../services/studioApi";
+
 import { formatNumber } from "../utils/numberUtils";
+
+const SERVICE_ICON_MAP = {
+  FiCamera,
+  FiUsers,
+  FiFilm,
+  FiBriefcase,
+  FiAperture,
+  FiSun,
+  FiAward,
+  FiHeart,
+};
+
+const DEFAULT_HERO_MEDIA = [
+  {
+    media_type: "image",
+    url: "https://images.unsplash.com/photo-1719500718255-1fe62df00856?q=80&w=1031&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    title: "Robel Studio Showcase",
+  },
+];
+
+const DEFAULT_STATS = [
+  { icon: SERVICE_ICON_MAP.FiUsers, value: 0, suffix: "+", label: "Happy Clients" },
+  { icon: SERVICE_ICON_MAP.FiCamera, value: 0, suffix: "+", label: "Years Experience" },
+  { icon: FiAward, value: 0, suffix: "+", label: "Awards Won" },
+  { icon: FiHeart, value: 0, suffix: "+", label: "Moments Captured" },
+];
+
+const DEFAULT_SOCIAL_LINKS = [
+  {
+    platform: "Instagram",
+    icon: "FiInstagram",
+    url: "https://www.instagram.com/robel_studioet/",
+  },
+  {
+    platform: "Facebook",
+    icon: "FiFacebook",
+    url: "https://web.facebook.com/robelstudiophotandvideo?_rdc=1&_rdr#",
+  },
+  {
+    platform: "TikTok",
+    icon: "FaTiktok",
+    url: "https://www.tiktok.com/@robelstudio",
+  },
+  {
+    platform: "Maps",
+    icon: "FiMapPin",
+    url: "https://maps.app.goo.gl/2vjswew27ztyZAy1A",
+  },
+  {
+    platform: "Email",
+    icon: "FiMail",
+    url: "mailto:robelasrat22@gmail.com",
+  },
+];
+
+const SOCIAL_ICON_LIBRARY = {
+  FiInstagram,
+  FiFacebook,
+  FiLinkedin,
+  FiTwitter,
+  FiMail,
+  FiPhone,
+  FiMapPin,
+  FiGlobe,
+  FiCalendar,
+  FiLink,
+  FiAward,
+  FiUsers,
+  FaTiktok,
+  FaWhatsapp,
+  FaYoutube,
+};
+
+const SOCIAL_ICON_KEYWORD_MAP = [
+  { keywords: ["instagram", "ig"], icon: FiInstagram },
+  { keywords: ["facebook", "meta"], icon: FiFacebook },
+  { keywords: ["linkedin"], icon: FiLinkedin },
+  { keywords: ["twitter", "x.com", "x "], icon: FiTwitter },
+  { keywords: ["whatsapp", "wa.me"], icon: FaWhatsapp },
+  { keywords: ["tiktok"], icon: FaTiktok },
+  { keywords: ["youtube"], icon: FaYoutube },
+  { keywords: ["map", "location", "pin", "address"], icon: FiMapPin },
+  { keywords: ["mail", "email"], icon: FiMail },
+  { keywords: ["phone", "call"], icon: FiPhone },
+  { keywords: ["calendar", "book", "booking"], icon: FiCalendar },
+  { keywords: ["site", "web", "portfolio", "globe"], icon: FiGlobe },
+];
+
+const resolveSocialIconComponent = (iconKey, platformLabel) => {
+  const normalizedKey = iconKey?.trim();
+  if (normalizedKey) {
+    const candidates = [normalizedKey];
+
+    const pascalKey =
+      normalizedKey.length > 1
+        ? normalizedKey[0].toUpperCase() + normalizedKey.slice(1)
+        : normalizedKey.toUpperCase();
+
+    candidates.push(pascalKey);
+
+    if (!normalizedKey.startsWith("Fi") && !normalizedKey.startsWith("Fa")) {
+      candidates.push(`Fi${pascalKey}`);
+      candidates.push(`Fa${pascalKey}`);
+    }
+
+    for (const candidate of candidates) {
+      if (SOCIAL_ICON_LIBRARY[candidate]) {
+        return SOCIAL_ICON_LIBRARY[candidate];
+      }
+    }
+  }
+
+  const normalizedLabel = platformLabel
+    ? platformLabel.toLowerCase().trim()
+    : "";
+  if (normalizedLabel) {
+    for (const entry of SOCIAL_ICON_KEYWORD_MAP) {
+      if (entry.keywords.some((keyword) => normalizedLabel.includes(keyword))) {
+        return entry.icon;
+      }
+    }
+  }
+
+  return FiLink;
+};
+
+const DEFAULT_MAP_EMBED_URL =
+  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3750.8793532340355!2d38.784787274749036!3d8.996747589493507!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x164b85e698e9d5d3%3A0x8e9292ac8fae83e2!2sRobel%20Studio!5e1!3m2!1sen!2set!4v1766144786785!5m2!1sen!2set";
+
+const sanitizePhoneValue = (value = "") => value.replace(/[^+0-9]/g, "");
+
+const buildWhatsappLink = (value = "") => {
+  const digitsOnly = value.replace(/[^0-9]/g, "");
+  if (!digitsOnly) {
+    return null;
+  }
+  return `https://wa.me/${digitsOnly}`;
+};
 
 // Generate fallback media items from portfolio
 const generateFallbackMedia = (portfolio) => {
-  if (!portfolio?.length) return [];
+  if (!portfolio?.length) return DEFAULT_HERO_MEDIA;
   return portfolio.slice(0, 4).map((img) => ({
     media_type: "image",
     url: img.url,
@@ -69,6 +210,9 @@ export default function StudioLanding() {
   const [portfolioIsDragging, setPortfolioIsDragging] = useState(false);
   const [portfolioDragStart, setPortfolioDragStart] = useState({ x: 0, y: 0 });
   const [currentTestimonialPage, setCurrentTestimonialPage] = useState(0);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [videoFilter, setVideoFilter] = useState("all");
+  const [showAllVideos, setShowAllVideos] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("studio-theme");
@@ -87,74 +231,283 @@ export default function StudioLanding() {
     services: [],
     testimonials: [],
     portfolio: [],
+    videos: [],
+    video_categories: [],
+    media_items: [],
+    categories: [],
+    contact_info: null,
+    social_links: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    serviceType: '',
-    projectDetails: ''
+    fullName: "",
+    email: "",
+    phone: "",
+    serviceType: "",
+    projectDetails: "",
   });
+  const [formStatus, setFormStatus] = useState({ type: null, message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth : 0
+  );
+  const [shouldLoadSelectedVideo, setShouldLoadSelectedVideo] = useState(false);
+  const [selectedVideoSource, setSelectedVideoSource] = useState("");
+  const [isHeroInView, setIsHeroInView] = useState(true);
+  const videoRef = useRef(null);
+  const selectedVideoPlayerRef = useRef(null);
+  const heroSectionRef = useRef(null);
 
-  // Icon mapping for services
-  const iconMap = {
-    FiCamera,
-    FiUsers,
-    FiFilm,
-    FiBriefcase,
-    FiAperture,
-    FiSun,
-  };
-
-  const fallbackMedia = generateFallbackMedia(studioData.portfolio);
-  const mediaItems =
-    studioData.media_items?.length > 0 ? studioData.media_items : fallbackMedia;
-  const currentMedia = mediaItems?.[currentIndex] || fallbackMedia[0];
-  const categories = [
-    "all",
-    ...(studioData.categories?.map((cat) => cat.slug) || []),
-  ];
-  const filteredImages =
-    filter === "all"
-      ? studioData.portfolio
-      : studioData.portfolio.filter((img) => img.category === filter);
-  const itemsPerPage = 3;
-  const totalPages = Math.ceil(studioData.testimonials.length / itemsPerPage);
-  const currentTestimonials = studioData.testimonials.slice(
-    currentTestimonialPage * itemsPerPage,
-    (currentTestimonialPage + 1) * itemsPerPage
+  const fallbackMedia = useMemo(
+    () => generateFallbackMedia(studioData.portfolio),
+    [studioData.portfolio]
   );
 
-  const stats =
-    studioData.content?.stats?.length > 0
+  const mediaItems = useMemo(() => {
+    if (Array.isArray(studioData.media_items) && studioData.media_items.length) {
+      return studioData.media_items;
+    }
+    return fallbackMedia;
+  }, [studioData.media_items, fallbackMedia]);
+  const mediaItemsCount = mediaItems.length;
+  const shouldAutoAdvance = isPlaying && isHeroInView && mediaItemsCount > 0;
+
+  const currentMedia = useMemo(() => {
+    if (mediaItems?.length) {
+      return mediaItems[currentIndex % mediaItems.length];
+    }
+    return DEFAULT_HERO_MEDIA[0];
+  }, [mediaItems, currentIndex]);
+
+  const categories = useMemo(() => {
+    const base = ["all"];
+    if (Array.isArray(studioData.categories)) {
+      base.push(
+        ...studioData.categories
+          .map((cat) => cat?.slug)
+          .filter(Boolean)
+      );
+    }
+    return Array.from(new Set(base));
+  }, [studioData.categories]);
+
+  const filteredImages = useMemo(() => {
+    if (!Array.isArray(studioData.portfolio)) {
+      return [];
+    }
+    if (filter === "all") {
+      return studioData.portfolio;
+    }
+    return studioData.portfolio.filter((img) => img.category === filter);
+  }, [filter, studioData.portfolio]);
+
+  const filteredVideos = useMemo(() => {
+    if (!Array.isArray(studioData.videos)) {
+      return [];
+    }
+    if (videoFilter === "all") {
+      return studioData.videos;
+    }
+    return studioData.videos.filter((video) => video.category === videoFilter);
+  }, [videoFilter, studioData.videos]);
+
+  const itemsPerPage = 3;
+  const totalPages = useMemo(() => {
+    const total = Array.isArray(studioData.testimonials)
+      ? studioData.testimonials.length
+      : 0;
+    return Math.max(1, Math.ceil(total / itemsPerPage));
+  }, [studioData.testimonials, itemsPerPage]);
+
+  const currentTestimonials = useMemo(() => {
+    if (!Array.isArray(studioData.testimonials)) {
+      return [];
+    }
+    const start = currentTestimonialPage * itemsPerPage;
+    return studioData.testimonials.slice(start, start + itemsPerPage);
+  }, [studioData.testimonials, currentTestimonialPage, itemsPerPage]);
+
+  const stats = useMemo(() => {
+    const resolvedStats = studioData.content?.stats?.length
       ? studioData.content.stats.map((stat) => ({
-          icon: iconMap[stat.icon] || FiUsers,
-          number: stat.value,
+          icon: SERVICE_ICON_MAP[stat.icon] || FiUsers,
+          value: stat.value,
+          suffix: stat.suffix || "",
           label: stat.label,
         }))
-      : [
-          { icon: FiUsers, number: "500+", label: "Happy Clients" },
-          { icon: FiCamera, number: "6+", label: "Years Experience" },
-          { icon: FiAward, number: "50+", label: "Awards Won" },
-          { icon: FiHeart, number: "1000+", label: "Moments Captured" },
-        ];
+      : DEFAULT_STATS;
+
+    return resolvedStats.map((stat) => ({
+      icon: stat.icon,
+      number:
+        typeof stat.value === "number"
+          ? `${formatNumber(stat.value)}${stat.suffix || ""}`
+          : stat.value || "",
+      label: stat.label,
+    }));
+  }, [studioData.content?.stats]);
+
+  const contactInfo = studioData.contact_info;
+
+  const resolvedSocialLinks = useMemo(() => {
+    if (!Array.isArray(studioData.social_links)) {
+      return [];
+    }
+    return [...studioData.social_links]
+      .filter((link) => link && link.is_active !== false && link.url)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [studioData.social_links]);
+
+  const socialLinksForDisplay =
+    resolvedSocialLinks.length > 0 ? resolvedSocialLinks : DEFAULT_SOCIAL_LINKS;
+
+  const socialLinksForFooter = socialLinksForDisplay;
+
+  const contactMethods = useMemo(() => {
+    if (!contactInfo) return [];
+    const methods = [];
+
+    if (contactInfo.phone) {
+      methods.push({
+        key: "phone",
+        title: "Call Us",
+        icon: FiPhone,
+        value: contactInfo.phone,
+        href: `tel:${sanitizePhoneValue(contactInfo.phone)}`,
+      });
+    }
+
+    if (contactInfo.whatsapp_number) {
+      const waLink = buildWhatsappLink(contactInfo.whatsapp_number);
+      if (waLink) {
+        methods.push({
+          key: "whatsapp",
+          title: "WhatsApp",
+          icon: FaWhatsapp,
+          value: contactInfo.whatsapp_number,
+          href: waLink,
+          external: true,
+        });
+      }
+    }
+
+    if (contactInfo.emergency_phone) {
+      methods.push({
+        key: "emergency",
+        title: "Emergency Line",
+        icon: FiAlertTriangle,
+        value: contactInfo.emergency_phone,
+        href: `tel:${sanitizePhoneValue(contactInfo.emergency_phone)}`,
+      });
+    }
+
+    if (contactInfo.email) {
+      methods.push({
+        key: "email",
+        title: "Email Us",
+        icon: FiMail,
+        value: contactInfo.email,
+        href: `mailto:${contactInfo.email}`,
+      });
+    }
+
+    if (contactInfo.booking_link) {
+      methods.push({
+        key: "booking",
+        title: "Book a Session",
+        icon: FiCalendar,
+        value: "Secure your slot online",
+        href: contactInfo.booking_link,
+        external: true,
+      });
+    }
+
+    if (contactInfo.address) {
+      methods.push({
+        key: "address",
+        title: "Visit Us",
+        icon: FiMapPin,
+        value: contactInfo.address,
+      });
+    }
+
+    if (contactInfo.office_hours) {
+      methods.push({
+        key: "hours",
+        title: "Office Hours",
+        icon: FiClock,
+        value: contactInfo.office_hours,
+      });
+    }
+
+    return methods;
+  }, [contactInfo]);
+
+  const officeHoursEntries = useMemo(() => {
+    if (!contactInfo?.office_hours) return null;
+    return contactInfo.office_hours
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }, [contactInfo?.office_hours]);
+
+  const mapEmbedUrl = contactInfo?.map_embed_url || DEFAULT_MAP_EMBED_URL;
+
+  const primaryCtaProps = useMemo(() => {
+    if (contactInfo?.booking_link) {
+      return {
+        href: contactInfo.booking_link,
+        target: "_blank",
+        rel: "noopener noreferrer",
+      };
+    }
+    if (contactInfo?.phone) {
+      return { href: `tel:${sanitizePhoneValue(contactInfo.phone)}` };
+    }
+    return { href: "#contact" };
+  }, [contactInfo]);
 
   useEffect(() => {
-    if (!isPlaying || !mediaItems?.length) return;
+    if (!shouldAutoAdvance) return;
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % mediaItems.length);
+      setCurrentIndex((prev) => (prev + 1) % mediaItemsCount);
     }, 5000);
     return () => clearInterval(interval);
-  }, [isPlaying, mediaItems?.length]);
+  }, [shouldAutoAdvance, mediaItemsCount]);
+
+  // Handle mobile video autoplay
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      if (videoRef.current && currentMedia?.media_type === "video") {
+        videoRef.current.play().catch(() => {
+          console.log("Video autoplay failed");
+        });
+      }
+    };
+
+    // Add event listeners for user interaction
+    document.addEventListener("touchstart", handleUserInteraction, {
+      once: true,
+    });
+    document.addEventListener("click", handleUserInteraction, { once: true });
+
+    return () => {
+      document.removeEventListener("touchstart", handleUserInteraction);
+      document.removeEventListener("click", handleUserInteraction);
+    };
+  }, [currentMedia?.media_type]);
 
   useEffect(() => {
     setCurrentIndex(0);
-  }, [mediaItems?.length]);
+  }, [mediaItemsCount]);
+
+  useEffect(() => {
+    setVideoError(false);
+  }, [currentMedia?.url]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -164,42 +517,118 @@ export default function StudioLanding() {
     }
   }, [isDarkMode]);
 
-  const loadStudioData = async () => {
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    let frameId = null;
+    const handleResize = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+      frameId = window.requestAnimationFrame(() => {
+        setViewportWidth(window.innerWidth);
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  const loadStudioData = useCallback(async () => {
     try {
+      setError(null);
       setLoading(true);
       const data = await fetchStudioData();
-      setStudioData(data);
+      if (!data) {
+        throw new Error("No studio data returned");
+      }
+      const normalizeArray = (value) => (Array.isArray(value) ? value : []);
+      setStudioData({
+        content: data.content || null,
+        services: normalizeArray(data.services),
+        testimonials: normalizeArray(data.testimonials),
+        portfolio: normalizeArray(data.portfolio),
+        videos: normalizeArray(data.videos),
+        video_categories: normalizeArray(data.video_categories),
+        media_items: normalizeArray(data.media_items),
+        categories: normalizeArray(data.categories),
+        contact_info: data.contact_info || null,
+        social_links: normalizeArray(data.social_links),
+      });
     } catch (err) {
-      setError("Failed to load studio data");
+      setError(err?.message || "Failed to load studio data");
       console.error("Error loading studio data:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadStudioData();
     setRefreshing(false);
-  };
+  }, [loadStudioData]);
 
   useEffect(() => {
     loadStudioData();
-  }, []);
+  }, [loadStudioData]);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.pageYOffset;
-      const windowHeight = window.innerHeight;
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const updateScrollState = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight || document.documentElement.clientHeight;
       const docHeight = document.documentElement.scrollHeight;
 
       setIsAtBottom(scrollTop + windowHeight >= docHeight - 100);
       setIsScrolled(scrollTop > 10);
     };
 
-    handleScroll();
-    window.addEventListener("scroll", handleScroll);
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        window.requestAnimationFrame(() => {
+          updateScrollState();
+          ticking = false;
+        });
+      }
+    };
+
+    updateScrollState();
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!heroSectionRef.current || typeof IntersectionObserver === "undefined") {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        setIsHeroInView(entry?.isIntersecting ?? true);
+      },
+      {
+        root: null,
+        threshold: 0.35,
+      }
+    );
+
+    observer.observe(heroSectionRef.current);
+    return () => observer.disconnect();
   }, []);
 
   const portfolioLightboxRef = useRef(null);
@@ -224,10 +653,10 @@ export default function StudioLanding() {
       const handleWheel = (e) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.5 : 0.5;
-        setPortfolioZoomLevel(prev => Math.max(1, Math.min(5, prev + delta)));
+        setPortfolioZoomLevel((prev) => Math.max(1, Math.min(5, prev + delta)));
       };
-      document.addEventListener('wheel', handleWheel, { passive: false });
-      return () => document.removeEventListener('wheel', handleWheel);
+      document.addEventListener("wheel", handleWheel, { passive: false });
+      return () => document.removeEventListener("wheel", handleWheel);
     }
   }, [selectedImage]);
 
@@ -236,45 +665,106 @@ export default function StudioLanding() {
       const handleWheel = (e) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.5 : 0.5;
-        setZoomLevel(prev => Math.max(1, Math.min(5, prev + delta)));
+        setZoomLevel((prev) => Math.max(1, Math.min(5, prev + delta)));
       };
-      document.addEventListener('wheel', handleWheel, { passive: false });
-      return () => document.removeEventListener('wheel', handleWheel);
+      document.addEventListener("wheel", handleWheel, { passive: false });
+      return () => document.removeEventListener("wheel", handleWheel);
     }
   }, [selectedServiceImage]);
 
+  useEffect(() => {
+    setShouldLoadSelectedVideo(false);
+    setSelectedVideoSource("");
+
+    if (!selectedVideoPlayerRef.current) {
+      return;
+    }
+
+    const player = selectedVideoPlayerRef.current;
+    player.pause();
+    player.currentTime = 0;
+    player.removeAttribute("src");
+    player.load();
+  }, [selectedVideo]);
+
+  useEffect(() => {
+    const player = selectedVideoPlayerRef.current;
+    if (!player || !shouldLoadSelectedVideo || !selectedVideoSource) {
+      return undefined;
+    }
+
+    player.load();
+
+    const playVideo = () => {
+      player.play().catch(() => {
+        /* Ignore autoplay issues; user can tap controls */
+      });
+    };
+
+    if (player.readyState >= 2) {
+      playVideo();
+      return undefined;
+    }
+
+    player.addEventListener("loadeddata", playVideo, { once: true });
+    return () => player.removeEventListener("loadeddata", playVideo);
+  }, [shouldLoadSelectedVideo, selectedVideoSource]);
+
+  const handleSelectedVideoPlay = useCallback(() => {
+    if (!selectedVideo?.video_url) return;
+    setSelectedVideoSource(selectedVideo.video_url);
+    setShouldLoadSelectedVideo(true);
+  }, [selectedVideo]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormStatus({ type: "loading", message: "Sending your message..." });
     setIsSubmitting(true);
-    
+
     try {
       // Simulate form submission
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // Reset form
       setFormData({
-        fullName: '',
-        email: '',
-        phone: '',
-        serviceType: '',
-        projectDetails: ''
+        fullName: "",
+        email: "",
+        phone: "",
+        serviceType: "",
+        projectDetails: "",
       });
-      
-      alert('Message sent successfully! We\'ll get back to you within 24 hours.');
+      setFormStatus({
+        type: "success",
+        message: "Message sent! We'll get back to you within 24 hours.",
+      });
     } catch (error) {
-      alert('Failed to send message. Please try again.');
+      setFormStatus({
+        type: "error",
+        message: "Failed to send message. Please try again.",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (!formStatus.message || formStatus.type === "loading") {
+      return undefined;
+    }
+    const timeoutId = setTimeout(
+      () => setFormStatus({ type: null, message: "" }),
+      5000
+    );
+    return () => clearTimeout(timeoutId);
+  }, [formStatus]);
 
   const toggleTheme = () => {
     const newDarkMode = !isDarkMode;
@@ -290,6 +780,7 @@ export default function StudioLanding() {
   };
 
   const openLightbox = (src, idx) => {
+    if (!filteredImages.length) return;
     setSelectedImage(src);
     setCurrentImageIndex(idx);
     setPortfolioZoomLevel(1);
@@ -298,6 +789,7 @@ export default function StudioLanding() {
   };
 
   const nextImage = () => {
+    if (!filteredImages.length) return;
     const nextIdx = (currentImageIndex + 1) % filteredImages.length;
     setCurrentImageIndex(nextIdx);
     setSelectedImage(filteredImages[nextIdx]?.url);
@@ -307,6 +799,7 @@ export default function StudioLanding() {
   };
 
   const prevImage = () => {
+    if (!filteredImages.length) return;
     const prevIdx =
       (currentImageIndex - 1 + filteredImages.length) % filteredImages.length;
     setCurrentImageIndex(prevIdx);
@@ -356,7 +849,7 @@ export default function StudioLanding() {
       {/* Navigation */}
       <nav
         className={`fixed top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 z-50 transition-all duration-300 ${
-          isScrolled || window.innerWidth < 768
+          isScrolled || viewportWidth < 768
             ? `backdrop-blur-md rounded-xl sm:rounded-2xl shadow-xl ${
                 isDarkMode
                   ? "bg-white/10 border border-white/20"
@@ -369,11 +862,6 @@ export default function StudioLanding() {
           <div className="flex items-center justify-between">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
-              {/* <img 
-                src={isDarkMode ? "/src/assets/light_logo.png" : "/src/assets/logo.png"}
-                alt="Robel Studio Logo" 
-                className="w-50 h-8 object-contain"
-              /> */}
               <span
                 className={`text-2xl bg-gradient-to-r transition-all duration-300 ${
                   isDarkMode
@@ -497,25 +985,100 @@ export default function StudioLanding() {
         )}
       </nav>
 
+      {error && (
+        <div className="fixed top-24 left-1/2 z-40 -translate-x-1/2 px-4 w-full max-w-xl">
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium shadow-lg ${
+              isDarkMode
+                ? "bg-slate-900/80 border-red-500/30 text-red-200"
+                : "bg-white border-red-500/20 text-red-700"
+            }`}
+          >
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center justify-center rounded-full px-4 py-2 bg-red-500 text-white text-xs uppercase tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {refreshing ? "Retrying..." : "Retry"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(loading || refreshing) && !error && (
+        <div className="fixed top-24 right-4 z-40">
+          <div
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold shadow-lg ${
+              isDarkMode
+                ? "bg-white/10 text-white border border-white/20"
+                : "bg-black/5 text-slate-700 border border-black/10"
+            }`}
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-pink-500 animate-pulse" />
+            <span>{loading ? "Loading studio data" : "Refreshing content"}</span>
+          </div>
+        </div>
+      )}
+
       {/* Hero */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      <section
+        ref={heroSectionRef}
+        className="relative min-h-screen flex items-center justify-center overflow-hidden"
+      >
         <div className="absolute inset-0 z-0">
-          {currentMedia?.media_type === "image" ? (
-            <img
-              key={currentIndex}
-              src={currentMedia?.url}
-              alt="Robel Studio"
-              className="h-full w-full object-cover transition-opacity duration-1000"
-            />
+          {currentMedia ? (
+            currentMedia.media_type === "image" ? (
+              <img
+                key={currentIndex}
+                src={currentMedia.url}
+                alt="Robel Studio"
+                className="h-full w-full object-cover transition-opacity duration-1000"
+              />
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  key={currentIndex}
+                  src={currentMedia.url || undefined}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  className="h-full w-full object-cover"
+                  onLoadedData={() => {
+                    if (videoRef.current) {
+                      videoRef.current.play().catch(() => {
+                        setVideoError(true);
+                      });
+                    }
+                  }}
+                  onError={() => setVideoError(true)}
+                />
+                {videoError && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <button
+                      onClick={() => {
+                        if (videoRef.current) {
+                          videoRef.current.play();
+                          setVideoError(false);
+                        }
+                      }}
+                      className="bg-white/20 backdrop-blur-md border border-white/30 rounded-full p-4 text-white hover:bg-white/30 transition-all"
+                    >
+                      <FiPlay size={24} />
+                    </button>
+                  </div>
+                )}
+              </>
+            )
           ) : (
-            <video
-              key={currentIndex}
-              src={currentMedia?.url}
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="h-full w-full object-cover"
+            <div
+              className={`${
+                isDarkMode ? "bg-slate-900" : "bg-slate-200"
+              } h-full w-full`}
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/60 to-black/80" />
@@ -553,35 +1116,16 @@ export default function StudioLanding() {
           transition={{ duration: 0.8, delay: 0.5 }}
           className="hidden md:flex fixed left-6 top-1/2 -translate-y-1/2 z-20 flex-col gap-4"
         >
-          {[
-            {
-              Icon: FiInstagram,
-              href: "https://www.instagram.com/robel_studioet/",
-              label: "Instagram",
-            },
-            {
-              Icon: FiFacebook,
-              href: "https://web.facebook.com/robelstudiophotandvideo?_rdc=1&_rdr#",
-              label: "Facebook",
-            },
-            {
-              Icon: FaTiktok,
-              href: "https://www.tiktok.com/@robelstudio",
-              label: "Twitter",
-            },
-            {
-              Icon: FiMapPin,
-              href: "https://maps.app.goo.gl/2vjswew27ztyZAy1A",
-              label: "LinkedIn",
-            },
-            {
-              Icon: FiMail,
-              href: "mailto:robelasrat22@gmail.com",
-              label: "Email",
-            },
-          ].map(({ Icon, href, label }, idx) => (
+          {socialLinksForDisplay.map((link, idx) => {
+            const IconComponent = resolveSocialIconComponent(
+              link.icon,
+              link.platform
+            );
+            const href = link.url || link.href || "#";
+            const label = link.platform || link.label || `Social Link ${idx + 1}`;
+            return (
             <motion.a
-              key={label}
+              key={`${label}-${href}`}
               href={href}
               target="_blank"
               rel="noopener noreferrer"
@@ -595,12 +1139,13 @@ export default function StudioLanding() {
               }`}
               aria-label={label}
             >
-              <Icon
+              <IconComponent
                 size={18}
                 className="group-hover:scale-110 transition-transform duration-300"
               />
             </motion.a>
-          ))}
+            );
+          })}
         </motion.div>
 
         {/* Scroll Button - Right Side */}
@@ -734,7 +1279,7 @@ export default function StudioLanding() {
             </h2>
             <p className="max-w-2xl text-slate-700 dark:text-slate-400 text-lg leading-relaxed mx-auto transition-colors duration-300">
               {studioData.content?.about_text ||
-                "Founded in 2018 in Addis Ababa, we're passionate photographers dedicated to capturing life's most precious moments with artistic vision and professional excellence."}
+                "Founded in 2018 in Addis Ababa, Robel Studio combines professional videography and photography expertise to create content that drives real business results. We specialize in video-first storytelling that engages audiences and delivers measurable ROI for our clients."}
             </p>
           </motion.div>
 
@@ -917,7 +1462,7 @@ export default function StudioLanding() {
                     isDarkMode ? "text-white" : "text-slate-900"
                   }`}
                 >
-                  {formatNumber(stat.number) + "+"}
+                  {stat.number}
                 </div>
                 <div className="text-slate-700 dark:text-slate-400 text-sm transition-colors duration-300">
                   {stat.label}
@@ -927,6 +1472,206 @@ export default function StudioLanding() {
           </motion.div>
         </div>
       </section>
+
+      {/* Video Portfolio - Full Screen Modal */}
+      {showAllVideos && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4"
+          onClick={() => setShowAllVideos(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="relative w-full max-w-7xl mx-auto bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-700/50 overflow-hidden max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-700/50 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-semibold text-white font-display">
+                    Complete Video Portfolio
+                  </h3>
+                  <p className="text-slate-400 text-sm mt-1">
+                    Explore our professional video productions across different
+                    industries
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAllVideos(false)}
+                  className="w-10 h-10 bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                >
+                  <FiX size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] custom-scrollbar">
+              {/* Video Filter Buttons */}
+              <div className="flex justify-center gap-3 mb-8 flex-wrap">
+                {[
+                  { key: "all", label: "All Videos" },
+                  ...(studioData.video_categories?.map((cat) => ({
+                    key: cat.slug,
+                    label: cat.name,
+                  })) || []),
+                ].map((cat) => (
+                  <motion.button
+                    key={cat.key}
+                    onClick={() => setVideoFilter(cat.key)}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.3 }}
+                    className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${
+                      videoFilter === cat.key
+                        ? "bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-600/25"
+                        : "bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:shadow-md"
+                    }`}
+                  >
+                    {cat.label}
+                  </motion.button>
+                ))}
+              </div>
+
+              {/* Video Gallery Grid */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                className="relative"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
+                  {filteredVideos.map((video, idx) => (
+                    <motion.div
+                      key={video.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: idx * 0.05 }}
+                      whileHover={{ y: -4 }}
+                      className="group cursor-pointer"
+                      onClick={() => setSelectedVideo(video)}
+                    >
+                      {/* Card Container */}
+                      <div className="overflow-hidden rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-300">
+                        {/* Thumbnail Container */}
+                        <div className="relative aspect-video overflow-hidden bg-slate-100 dark:bg-slate-800">
+                          {video.thumbnail_url ? (
+                            <>
+                              <img
+                                src={video.thumbnail_url}
+                                alt={video.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center">
+                                <FiPlay size={24} className="text-white ml-1" />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Category Badge */}
+                          <div className="absolute top-1 left-3">
+                            <span className="text-xs font-medium px-2 py-1 bg-black/70 text-white rounded">
+                              {video.category.replace("-", " ").toUpperCase()}
+                            </span>
+                          </div>
+
+                          {/* Duration Badge */}
+                          {video.duration && (
+                            <div className="absolute bottom-3 right-3">
+                              <span className="text-xs font-medium px-2 py-1 bg-black/70 text-white rounded">
+                                {video.duration}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Play Overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <div className="w-14 h-14 bg-white/90 dark:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                              <FiPlay
+                                size={20}
+                                className="text-slate-900 dark:text-white ml-1"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Content Section */}
+                        <div className="p-4">
+                          <h4 className="font-semibold text-slate-900 dark:text-white mb-2 line-clamp-2 leading-tight">
+                            {video.title}
+                          </h4>
+
+                          {/* Metadata */}
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-4 text-slate-600 dark:text-slate-400">
+                              {video.views && (
+                                <div className="flex items-center gap-1.5">
+                                  <FiEye size={14} />
+                                  <span>{video.views}</span>
+                                </div>
+                              )}
+
+                              {video.year && (
+                                <div className="flex items-center gap-1.5">
+                                  <FiCalendar size={14} />
+                                  <span>{video.year}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Loading State */}
+                {/* {filteredVideos.length === 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
+                    {[...Array(8)].map((_, idx) => (
+                      <div key={idx} className="animate-pulse">
+                        <div className="aspect-video bg-slate-200 dark:bg-slate-800 rounded-xl mb-4" />
+                        <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded mb-2" />
+                        <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
+                      </div>
+                    ))}
+                  </div>
+                )} */}
+                {filteredVideos.length === 0 && (
+                  <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+                    <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200">
+                      Nothing here yet
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                      We couldn’t find any matching videos.
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+
+              {/* Video Count & CTA */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="text-center mt-12 text-sm text-white font-display"
+              >
+                {filteredVideos.length} Videos Available
+              </motion.div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
 
       {/* Services */}
       <section id="services" className="section-padding">
@@ -961,7 +1706,7 @@ export default function StudioLanding() {
 
           <div className="space-y-24">
             {studioData.services.map((service, idx) => {
-              const ServiceIcon = iconMap[service.icon] || FiCamera;
+              const ServiceIcon = SERVICE_ICON_MAP[service.icon] || FiCamera;
               return (
                 <motion.div
                   key={service.title}
@@ -1046,16 +1791,21 @@ export default function StudioLanding() {
                           />
                           <div
                             className={`absolute inset-0 bg-gradient-to-t via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 ${
-                              isDarkMode ? "from-slate-950/80" : "from-slate-900/70"
+                              isDarkMode
+                                ? "from-slate-950/80"
+                                : "from-slate-900/70"
                             }`}
                           >
                             <div className="absolute bottom-4 left-4 right-4">
                               <div className="flex items-center justify-between">
                                 <span className="text-white text-sm font-medium bg-slate-900/70 backdrop-blur-sm px-3 py-1 rounded-full">
-                                  {service.title.split(' ')[0]}
+                                  {service.title.split(" ")[0]}
                                 </span>
                                 <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                                  <FiMaximize2 size={14} className="text-white" />
+                                  <FiMaximize2
+                                    size={14}
+                                    className="text-white"
+                                  />
                                 </div>
                               </div>
                             </div>
@@ -1167,6 +1917,179 @@ export default function StudioLanding() {
                 </div>
               </motion.div>
             ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Video Portfolio */}
+      <section
+        className={`py-20 transition-colors duration-300 ${
+          isDarkMode ? "bg-slate-950" : "bg-white"
+        }`}
+        id="video-portfolio"
+      >
+        <div className="container-app">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium mb-4 transition-colors duration-300 ${
+                isDarkMode
+                  ? "bg-slate-800/50 border border-slate-700/50 text-slate-300"
+                  : "bg-pink-100 border border-pink-200 text-pink-700"
+              }`}
+            >
+              Video Portfolio
+            </span>
+            <h2
+              className={`text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl leading-tight font-display mb-4 transition-colors duration-300 ${
+                isDarkMode ? "text-white" : "text-slate-900"
+              }`}
+            >
+              Our Cinematic Work
+            </h2>
+            <p className="max-w-2xl text-slate-700 dark:text-slate-400 text-lg leading-relaxed mx-auto transition-colors duration-300">
+              Explore our professional video productions across different
+              industries. Each video showcases our expertise in cinematic
+              storytelling and professional videography.
+            </p>
+          </motion.div>
+
+          {/* Featured Video Portfolio */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mb-16"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h3
+                className={`text-md sm:text-2xl font-bold font-display transition-colors duration-300 ${
+                  isDarkMode ? "text-white" : "text-slate-900"
+                }`}
+              >
+                Featured Video Work
+              </h3>
+              <button
+                onClick={() => setShowAllVideos(true)}
+                className="flex items-center gap-2 bg-pink-600 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-pink-700 transition-all duration-300 hover:scale-105"
+              >
+                <FiFilm size={16} />
+                View All {studioData.videos.length} Videos
+              </button>
+            </div>
+
+            {/* Featured Video Grid */}
+            <div className="grid md:grid-cols-3 gap-8">
+              {studioData.videos.slice(0, 6).map((video, idx) => (
+                <motion.div
+                  key={video.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: idx * 0.2 }}
+                  className={`group relative overflow-hidden rounded-2xl backdrop-blur-md border transition-all duration-300 hover:scale-105 cursor-pointer ${
+                    isDarkMode
+                      ? "bg-slate-800/50 border-slate-700/50"
+                      : "bg-white/80 border-slate-200/50 shadow-lg"
+                  }`}
+                  onClick={() => setSelectedVideo(video)}
+                >
+                  {/* Video Thumbnail */}
+                  <div className="relative aspect-video overflow-hidden rounded-t-2xl">
+                    {video.thumbnail_url ? (
+                      <img
+                        src={video.thumbnail_url}
+                        alt={video.title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-pink-500/20 to-purple-500/20 flex items-center justify-center">
+                        <div className="text-center">
+                          <FiPlay
+                            size={40}
+                            className="text-pink-400 mx-auto mb-2"
+                          />
+                          <span className="text-sm text-slate-400 font-medium">
+                            Demo Video
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center group-hover:bg-white/30 transition-all">
+                        <FiPlay size={24} className="text-white ml-1" />
+                      </div>
+                    </div>
+
+                    <div
+                      className={`absolute top-4 left-4 bg-gradient-to-r px-3 py-1 rounded-full text-sm font-medium ${
+                        isDarkMode
+                          ? "from-pink-400 to-purple-400 hover:from-pink-300 hover:to-purple-300"
+                          : "from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700"
+                      }`}
+                    >
+                      {video.category.replace("-", " ").toUpperCase()}
+                    </div>
+                    {video.duration && (
+                      <div className="absolute bottom-4 right-4 bg-black/70 text-white text-xs font-medium px-2 py-1 rounded">
+                        {video.duration}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-6">
+                    <h4
+                      className={`text-lg font-semibold mb-2 font-display transition-colors duration-300 ${
+                        isDarkMode ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {video.title}
+                    </h4>
+                    <p
+                      className={`text-sm leading-relaxed transition-colors duration-300 ${
+                        isDarkMode ? "text-slate-300" : "text-slate-600"
+                      } line-clamp-3`}
+                    >
+                      {video.description}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Main CTA */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="text-center"
+          >
+            <div className="space-y-4">
+              <button
+                onClick={() => setShowAllVideos(true)}
+                className="inline-flex items-center gap-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white px-8 py-4 rounded-full font-semibold hover:shadow-lg hover:shadow-pink-600/25 transition-all duration-300 hover:scale-105 cursor-pointer"
+              >
+                <FiFilm size={20} />
+                Explore Full Video Portfolio
+                <FiArrowRight size={18} />
+              </button>
+              <p
+                className={`text-sm transition-colors duration-300 ${
+                  isDarkMode ? "text-slate-400" : "text-slate-600"
+                }`}
+              >
+                Featuring {studioData.videos.length} professional video
+                productions
+              </p>
+            </div>
           </motion.div>
         </div>
       </section>
@@ -1335,7 +2258,7 @@ export default function StudioLanding() {
                 that will last a lifetime.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="#contact">
+                <a {...primaryCtaProps}>
                   <button className="bg-white text-pink-600 px-8 py-4 rounded-full font-semibold hover:bg-white/90 transition-all duration-300 flex items-center gap-2 justify-center w-full sm:w-auto">
                     Book Session <FiArrowRight size={18} />
                   </button>
@@ -1391,98 +2314,126 @@ export default function StudioLanding() {
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className={`p-6 text-center hover:scale-105 transition-all duration-300 rounded-2xl backdrop-blur-md border ${
-                isDarkMode
-                  ? "bg-slate-800/50 border-slate-700/50"
-                  : "bg-white/80 border-slate-200/50 shadow-sm"
-              }`}
-            >
-              <div className="w-16 h-16 bg-pink-600/20 rounded-2xl flex items-center justify-center text-pink-400 mx-auto mb-4">
-                <FiPhone size={24} />
-              </div>
-              <h3
-                className={`text-lg font-semibold mb-2 transition-colors duration-300 ${
-                  isDarkMode ? "text-white" : "text-slate-900"
-                }`}
-              >
-                Call Us
-              </h3>
-              <a
-                href="tel:+251911199762"
-                className={`transition-colors hover:text-pink-400 ${
-                  isDarkMode ? "text-slate-300" : "text-slate-700"
-                }`}
-              >
-                +251 911199762
-              </a>
-            </motion.div>
+          {contactMethods.length > 0 ? (
+            <div className="grid md:grid-cols-3 gap-6 mb-12">
+              {contactMethods.map((method, idx) => {
+                const IconComponent = method.icon || FiLink;
+                const interactiveProps = method.href
+                  ? {
+                      href: method.href,
+                      target: method.external ? "_blank" : undefined,
+                      rel: method.external ? "noopener noreferrer" : undefined,
+                    }
+                  : {};
 
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className={`p-6 text-center hover:scale-105 transition-all duration-300 rounded-2xl backdrop-blur-md border ${
-                isDarkMode
-                  ? "bg-slate-800/50 border-slate-700/50"
-                  : "bg-white/80 border-slate-200/50 shadow-sm"
-              }`}
-            >
-              <div className="w-16 h-16 bg-pink-600/20 rounded-2xl flex items-center justify-center text-pink-400 mx-auto mb-4">
-                <FiMail size={24} />
-              </div>
-              <h3
-                className={`text-lg font-semibold mb-2 transition-colors duration-300 ${
-                  isDarkMode ? "text-white" : "text-slate-900"
-                }`}
-              >
-                Email Us
-              </h3>
-              <a
-                href="mailto:robelasrat22@gmail.com"
-                className={`transition-colors hover:text-pink-400 ${
-                  isDarkMode ? "text-slate-300" : "text-slate-700"
-                }`}
-              >
-                robelasrat22@gmail.com
-              </a>
-            </motion.div>
+                const Wrapper = method.href ? "a" : "div";
 
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className={`p-6 text-center hover:scale-105 transition-all duration-300 rounded-2xl backdrop-blur-md border ${
+                return (
+                  <motion.div
+                    key={method.key || method.title}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.08 }}
+                    className={`p-6 text-center hover:scale-105 transition-all duration-300 rounded-2xl backdrop-blur-md border ${
+                      isDarkMode
+                        ? "bg-slate-800/50 border-slate-700/50"
+                        : "bg-white/80 border-slate-200/50 shadow-sm"
+                    }`}
+                  >
+                    <div className="w-16 h-16 bg-pink-600/20 rounded-2xl flex items-center justify-center text-pink-400 mx-auto mb-4">
+                      <IconComponent size={24} />
+                    </div>
+                    <h3
+                      className={`text-lg font-semibold mb-2 transition-colors duration-300 ${
+                        isDarkMode ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {method.title}
+                    </h3>
+                    <Wrapper
+                      {...interactiveProps}
+                      className={`${
+                        method.href
+                          ? "transition-colors hover:text-pink-400"
+                          : ""
+                      } ${
+                        isDarkMode ? "text-slate-300" : "text-slate-700"
+                      } whitespace-pre-line`}
+                    >
+                      {method.value}
+                    </Wrapper>
+                  </motion.div>
+                );
+              })}
+            </div>
+          ) : (
+            <div
+              className={`mb-12 p-6 rounded-2xl border text-center text-sm ${
                 isDarkMode
-                  ? "bg-slate-800/50 border-slate-700/50"
-                  : "bg-white/80 border-slate-200/50 shadow-sm"
+                  ? "border-slate-700/50 text-slate-400"
+                  : "border-slate-200 text-slate-600"
               }`}
             >
-              <div className="w-16 h-16 bg-pink-600/20 rounded-2xl flex items-center justify-center text-pink-400 mx-auto mb-4">
-                <FiMapPin size={24} />
+              Contact information will appear here once it is configured.
+            </div>
+          )}
+
+          {resolvedSocialLinks.length > 0 && (
+            <div
+              className={`mb-12 rounded-2xl border p-6 flex flex-col gap-4 ${
+                isDarkMode
+                  ? "border-slate-700/50 bg-slate-800/30"
+                  : "border-slate-200 bg-white/80 shadow-sm"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-pink-600/15 flex items-center justify-center text-pink-500">
+                  <FiLink size={18} />
+                </div>
+                <div>
+                  <p
+                    className={`text-sm mb-1 ${
+                      isDarkMode ? "text-slate-300" : "text-slate-700"
+                    }`}
+                  >
+                    Connect With Us
+                  </p>
+                  <p
+                    className={`text-base font-semibold ${
+                      isDarkMode ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    Social & Messaging Channels
+                  </p>
+                </div>
               </div>
-              <h3
-                className={`text-lg font-semibold mb-2 transition-colors duration-300 ${
-                  isDarkMode ? "text-white" : "text-slate-900"
-                }`}
-              >
-                Visit Us
-              </h3>
-              <p
-                className={`transition-colors duration-300 ${
-                  isDarkMode ? "text-slate-300" : "text-slate-700"
-                }`}
-              >
-                Addis Ababa, Ethiopia
-              </p>
-            </motion.div>
-          </div>
+              <div className="flex flex-wrap gap-3">
+                {resolvedSocialLinks.map((link) => {
+                  const IconComponent = resolveSocialIconComponent(
+                    link.icon,
+                    link.platform
+                  );
+                  return (
+                    <a
+                      key={`${link.platform}-${link.id || link.url}`}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                        isDarkMode
+                          ? "bg-slate-800/60 text-slate-200 hover:bg-slate-700/60"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      <IconComponent size={16} />
+                      {link.platform}
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="grid lg:grid-cols-5 gap-8">
             <motion.div
@@ -1635,8 +2586,21 @@ export default function StudioLanding() {
                   className="w-full bg-gradient-to-r from-pink-600 to-rose-600 text-white py-4 px-8 rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-pink-600/25 transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   <FiSend size={18} />
-                  {isSubmitting ? 'Sending...' : 'Send Message'}
+                  {isSubmitting ? "Sending..." : "Send Message"}
                 </button>
+                {formStatus.message && (
+                  <p
+                    className={`text-sm text-center font-medium ${
+                      formStatus.type === "error"
+                        ? "text-red-400"
+                        : formStatus.type === "success"
+                        ? "text-emerald-400"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    {formStatus.message}
+                  </p>
+                )}
               </form>
             </motion.div>
 
@@ -1666,42 +2630,78 @@ export default function StudioLanding() {
                   </h3>
                 </div>
                 <div className="space-y-3">
-                  <div
-                    className={`flex justify-between items-center py-2 border-b transition-colors duration-300 ${
-                      isDarkMode ? "border-slate-800/50" : "border-slate-200/50"
-                    }`}
-                  >
-                    <span
-                      className={`font-medium transition-colors duration-300 ${
-                        isDarkMode ? "text-slate-300" : "text-slate-700"
-                      }`}
-                    >
-                      Monday - Saturday
-                    </span>
-                    <span
-                      className={`font-semibold transition-colors duration-300 ${
-                        isDarkMode ? "text-white" : "text-slate-900"
-                      }`}
-                    >
-                      08:30 AM - 08:00 PM
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span
-                      className={`font-medium transition-colors duration-300 ${
-                        isDarkMode ? "text-slate-300" : "text-slate-700"
-                      }`}
-                    >
-                      Sunday
-                    </span>
-                    <span
-                      className={`font-semibold transition-colors duration-300 ${
-                        isDarkMode ? "text-white" : "text-slate-900"
-                      }`}
-                    >
-                      02:00 AM - 02:00 PM
-                    </span>
-                  </div>
+                  {officeHoursEntries ? (
+                    officeHoursEntries.map((entry, idx) => {
+                      const [label, ...rest] = entry.split(":");
+                      const value = rest.join(":").trim();
+                      return (
+                        <div
+                          key={`${entry}-${idx}`}
+                          className={`flex justify-between items-center py-2 border-b last:border-b-0 transition-colors duration-300 ${
+                            isDarkMode
+                              ? "border-slate-800/50"
+                              : "border-slate-200/50"
+                          }`}
+                        >
+                          <span
+                            className={`font-medium transition-colors duration-300 ${
+                              isDarkMode ? "text-slate-300" : "text-slate-700"
+                            }`}
+                          >
+                            {value ? label : ""}
+                          </span>
+                          <span
+                            className={`font-semibold text-right transition-colors duration-300 ${
+                              isDarkMode ? "text-white" : "text-slate-900"
+                            }`}
+                          >
+                            {value || entry}
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <>
+                      <div
+                        className={`flex justify-between items-center py-2 border-b transition-colors duration-300 ${
+                          isDarkMode
+                            ? "border-slate-800/50"
+                            : "border-slate-200/50"
+                        }`}
+                      >
+                        <span
+                          className={`font-medium transition-colors duration-300 ${
+                            isDarkMode ? "text-slate-300" : "text-slate-700"
+                          }`}
+                        >
+                          Monday - Saturday
+                        </span>
+                        <span
+                          className={`font-semibold transition-colors duration-300 ${
+                            isDarkMode ? "text-white" : "text-slate-900"
+                          }`}
+                        >
+                          08:30 AM - 08:00 PM
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span
+                          className={`font-medium transition-colors duration-300 ${
+                            isDarkMode ? "text-slate-300" : "text-slate-700"
+                          }`}
+                        >
+                          Sunday
+                        </span>
+                        <span
+                          className={`font-semibold transition-colors duration-300 ${
+                            isDarkMode ? "text-white" : "text-slate-900"
+                          }`}
+                        >
+                          02:00 AM - 02:00 PM
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               <div
@@ -1712,7 +2712,7 @@ export default function StudioLanding() {
                 }`}
               >
                 <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3750.8793532340355!2d38.784787274749036!3d8.996747589493507!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x164b85e698e9d5d3%3A0x8e9292ac8fae83e2!2sRobel%20Studio!5e1!3m2!1sen!2set!4v1766144786785!5m2!1sen!2set"
+                  src={mapEmbedUrl}
                   width="100%"
                   height="400"
                   style={{ border: 0 }}
@@ -1759,45 +2759,28 @@ export default function StudioLanding() {
             </div>
 
             <div className="flex items-center gap-4">
-              {[
-                {
-                  Icon: FiInstagram,
-                  href: "https://www.instagram.com/robel_studioet/",
-                  label: "Instagram",
-                },
-                {
-                  Icon: FiFacebook,
-                  href: "https://web.facebook.com/robelstudiophotandvideo?_rdc=1&_rdr#",
-                  label: "Facebook",
-                },
-                {
-                  Icon: FaTiktok,
-                  href: "https://www.tiktok.com/@robelstudio",
-                  label: "Twitter",
-                },
-                {
-                  Icon: FiMapPin,
-                  href: "https://maps.app.goo.gl/2vjswew27ztyZAy1A",
-                  label: "LinkedIn",
-                },
-                {
-                  Icon: FiMail,
-                  href: "mailto:robelasrat22@gmail.com",
-                  label: "Email",
-                },
-              ].map(({ Icon, href }, idx) => (
-                <a
-                  key={idx}
-                  href={href}
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                    isDarkMode
-                      ? "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50"
-                      : "bg-slate-200/50 text-slate-600 hover:text-slate-900 hover:bg-slate-300/50"
-                  }`}
-                >
-                  <Icon size={18} />
-                </a>
-              ))}
+              {socialLinksForFooter.map((link) => {
+                const IconComponent = resolveSocialIconComponent(
+                  link.icon,
+                  link.platform
+                );
+                return (
+                  <a
+                    key={`${link.platform}-${link.url}`}
+                    href={link.url}
+                    title={link.platform}
+                    target={link.url.startsWith("http") ? "_blank" : undefined}
+                    rel={link.url.startsWith("http") ? "noopener noreferrer" : undefined}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                      isDarkMode
+                        ? "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50"
+                        : "bg-slate-200/50 text-slate-600 hover:text-slate-900 hover:bg-slate-300/50"
+                    }`}
+                  >
+                    <IconComponent size={18} />
+                  </a>
+                );
+              })}
             </div>
           </div>
 
@@ -1833,7 +2816,9 @@ export default function StudioLanding() {
           {/* Zoom Display */}
           <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
             <div className="w-16 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
-              <span className="text-sm font-medium">{Math.round(portfolioZoomLevel * 100)}%</span>
+              <span className="text-sm font-medium">
+                {Math.round(portfolioZoomLevel * 100)}%
+              </span>
             </div>
           </div>
           {filteredImages.length > 1 && (
@@ -1868,7 +2853,10 @@ export default function StudioLanding() {
             onMouseDown={(e) => {
               if (portfolioZoomLevel > 1) {
                 setPortfolioIsDragging(true);
-                setPortfolioDragStart({ x: e.clientX - portfolioPanX, y: e.clientY - portfolioPanY });
+                setPortfolioDragStart({
+                  x: e.clientX - portfolioPanX,
+                  y: e.clientY - portfolioPanY,
+                });
               }
             }}
             onMouseMove={(e) => {
@@ -1879,7 +2867,14 @@ export default function StudioLanding() {
             }}
             onMouseUp={() => setPortfolioIsDragging(false)}
             onMouseLeave={() => setPortfolioIsDragging(false)}
-            style={{ cursor: portfolioZoomLevel > 1 ? (portfolioIsDragging ? 'grabbing' : 'grab') : 'default' }}
+            style={{
+              cursor:
+                portfolioZoomLevel > 1
+                  ? portfolioIsDragging
+                    ? "grabbing"
+                    : "grab"
+                  : "default",
+            }}
           >
             <img
               src={selectedImage}
@@ -1887,7 +2882,9 @@ export default function StudioLanding() {
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
               style={{
                 transform: `scale(${portfolioZoomLevel}) translate(${portfolioPanX}px, ${portfolioPanY}px)`,
-                transition: portfolioIsDragging ? 'none' : 'transform 0.3s ease'
+                transition: portfolioIsDragging
+                  ? "none"
+                  : "transform 0.3s ease",
               }}
             />
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md rounded-full px-4 py-2">
@@ -1934,9 +2931,7 @@ export default function StudioLanding() {
               </div>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] custom-scrollbar">
-              <motion.div
-                className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4"
-              >
+              <motion.div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
                 {selectedService.gallery_images.map((img, idx) => (
                   <motion.div
                     key={idx}
@@ -1981,10 +2976,20 @@ export default function StudioLanding() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4"
-          onClick={() => { setSelectedServiceImage(null); setZoomLevel(1); setPanX(0); setPanY(0); }}
+          onClick={() => {
+            setSelectedServiceImage(null);
+            setZoomLevel(1);
+            setPanX(0);
+            setPanY(0);
+          }}
         >
           <button
-            onClick={() => { setSelectedServiceImage(null); setZoomLevel(1); setPanX(0); setPanY(0); }}
+            onClick={() => {
+              setSelectedServiceImage(null);
+              setZoomLevel(1);
+              setPanX(0);
+              setPanY(0);
+            }}
             className="absolute top-6 right-6 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
           >
             <FiX size={20} />
@@ -1992,7 +2997,9 @@ export default function StudioLanding() {
           {/* Zoom Display */}
           <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
             <div className="w-16 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
-              <span className="text-sm font-medium">{Math.round(zoomLevel * 100)}%</span>
+              <span className="text-sm font-medium">
+                {Math.round(zoomLevel * 100)}%
+              </span>
             </div>
           </div>
           {selectedService && selectedService.gallery_images.length > 1 && (
@@ -2040,7 +3047,10 @@ export default function StudioLanding() {
             }}
             onMouseUp={() => setIsDragging(false)}
             onMouseLeave={() => setIsDragging(false)}
-            style={{ cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+            style={{
+              cursor:
+                zoomLevel > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+            }}
           >
             <img
               src={selectedServiceImage}
@@ -2048,7 +3058,7 @@ export default function StudioLanding() {
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
               style={{
                 transform: `scale(${zoomLevel}) translate(${panX}px, ${panY}px)`,
-                transition: isDragging ? 'none' : 'transform 0.3s ease'
+                transition: isDragging ? "none" : "transform 0.3s ease",
               }}
             />
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md rounded-full px-4 py-2">
@@ -2056,6 +3066,86 @@ export default function StudioLanding() {
                 {currentServiceImageIndex + 1} /{" "}
                 {selectedService?.gallery_images.length}
               </span>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Video Player Modal */}
+      {selectedVideo && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4"
+          onClick={() => setSelectedVideo(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="relative w-full max-w-4xl mx-auto bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-700/50 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-700/50 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-semibold text-white font-display">
+                    {selectedVideo.title}
+                  </h3>
+                  <p className="text-slate-400 text-sm mt-1">
+                    {selectedVideo.description}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedVideo(null)}
+                  className="w-10 h-10 bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                >
+                  <FiX size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="relative bg-black rounded-xl overflow-hidden">
+                <video
+                  key={selectedVideo.id || selectedVideo.video_url}
+                  ref={selectedVideoPlayerRef}
+                  src={selectedVideoSource || undefined}
+                  controls
+                  playsInline
+                  className="w-full aspect-video"
+                  poster={selectedVideo.thumbnail_url}
+                  preload={shouldLoadSelectedVideo ? "metadata" : "none"}
+                >
+                  Your browser does not support the video tag.
+                  <a
+                    href={selectedVideo.video_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Click here to view the video
+                  </a>
+                </video>
+                {!shouldLoadSelectedVideo && (
+                  <button
+                    type="button"
+                    onClick={handleSelectedVideoPlay}
+                    aria-label="Play video"
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-white font-semibold tracking-wide"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                      <FiPlay size={28} className="ml-1" />
+                    </div>
+                    <span>Play Video</span>
+                  </button>
+                )}
+              </div>
+              <div className="mt-4 text-center">
+                <p className="text-slate-400 text-sm">
+                  Explore our professional video productions across different
+                  industries.
+                </p>
+              </div>
             </div>
           </motion.div>
         </motion.div>

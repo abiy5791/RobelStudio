@@ -1,7 +1,84 @@
+import re
 from rest_framework import serializers
 from django.conf import settings
 from django.db.models import Count
-from .models import Album, Photo, GuestMessage, PhotoLike, StudioContent, StudioStat, Service, Testimonial, PortfolioImage, ServiceGalleryImage, PortfolioCategory, MediaItem
+from .models import (
+    Album,
+    Photo,
+    GuestMessage,
+    PhotoLike,
+    StudioContent,
+    StudioStat,
+    Service,
+    Testimonial,
+    PortfolioImage,
+    ServiceGalleryImage,
+    PortfolioCategory,
+    MediaItem,
+    Video,
+    VideoCategory,
+    StudioContactInfo,
+    SocialLink,
+)
+
+
+class IntegerPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
+    """Custom field that converts string to integer for foreign keys"""
+    def to_internal_value(self, data):
+        if isinstance(data, str) and data.isdigit():
+            data = int(data)
+        return super().to_internal_value(data)
+
+
+PHONE_REGEX = re.compile(r'^\+?[0-9\s\-\(\)]{7,20}$')
+
+
+def _validate_phone(value, label):
+    if value:
+        normalized = value.strip()
+        if not PHONE_REGEX.match(normalized):
+            raise serializers.ValidationError(f"Enter a valid {label} number (include country code, digits only).")
+        return normalized
+    return value
+
+
+def _validate_https_url(value, label):
+    if value:
+        value = value.strip()
+        if not value.lower().startswith('https://'):
+            raise serializers.ValidationError(f"{label} must start with https:// for security.")
+        return value
+    return value
+
+
+ICON_KEYWORD_MAP = [
+    (["instagram", "ig"], "FiInstagram"),
+    (["facebook", "fb", "meta"], "FiFacebook"),
+    (["linkedin"], "FiLinkedin"),
+    (["twitter", "x.com", "x "], "FiTwitter"),
+    (["whatsapp", "wa.me"], "FaWhatsapp"),
+    (["tiktok"], "FaTiktok"),
+    (["youtube"], "FaYoutube"),
+    (["map", "location", "pin"], "FiMapPin"),
+    (["mail", "email"], "FiMail"),
+    (["phone", "call"], "FiPhone"),
+    (["calendar", "book", "booking"], "FiCalendar"),
+    (["site", "web", "portfolio", "globe"], "FiGlobe"),
+]
+
+
+def _infer_icon_value(icon_value=None, platform_label=None):
+    if icon_value:
+        icon_value = icon_value.strip()
+        if icon_value:
+            return icon_value
+
+    normalized_label = (platform_label or "").strip().lower()
+    if normalized_label:
+        for keywords, icon in ICON_KEYWORD_MAP:
+            if any(keyword in normalized_label for keyword in keywords):
+                return icon
+    return "FiLink"
 
 
 class GuestMessageSerializer(serializers.ModelSerializer):
@@ -187,6 +264,75 @@ class StudioContentSerializer(serializers.ModelSerializer):
         return StudioStatSerializer(stats, many=True).data
 
 
+class StudioContactInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudioContactInfo
+        fields = [
+            'id',
+            'phone',
+            'whatsapp_number',
+            'email',
+            'address',
+            'map_embed_url',
+            'booking_link',
+            'office_hours',
+            'emergency_phone',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'updated_at']
+
+
+class StudioContactInfoUpdateSerializer(StudioContactInfoSerializer):
+    class Meta(StudioContactInfoSerializer.Meta):
+        read_only_fields = ['id', 'updated_at']
+
+    def validate_phone(self, value):
+        return _validate_phone(value, 'primary phone')
+
+    def validate_whatsapp_number(self, value):
+        return _validate_phone(value, 'WhatsApp')
+
+    def validate_emergency_phone(self, value):
+        return _validate_phone(value, 'emergency phone')
+
+    def validate_booking_link(self, value):
+        return _validate_https_url(value, 'Booking link')
+
+    def validate_map_embed_url(self, value):
+        return _validate_https_url(value, 'Map URL')
+
+
+class SocialLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SocialLink
+        fields = ['id', 'platform', 'icon', 'url', 'order', 'is_active']
+
+
+class SocialLinkCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SocialLink
+        fields = ['platform', 'icon', 'url', 'order', 'is_active']
+        extra_kwargs = {
+            'icon': {'required': False, 'allow_blank': True},
+            'order': {'required': False},
+            'is_active': {'required': False},
+        }
+
+    def validate_platform(self, value):
+        return value.strip()
+
+    def validate_url(self, value):
+        return _validate_https_url(value, 'Social link URL')
+
+    def validate(self, attrs):
+        # Ensure icon value persists if provided, otherwise infer a sensible default
+        if self.instance is None or 'icon' in attrs:
+            icon_value = attrs.get('icon', self.initial_data.get('icon'))
+            platform_label = attrs.get('platform') or self.initial_data.get('platform')
+            attrs['icon'] = _infer_icon_value(icon_value, platform_label)
+        return attrs
+
+
 class ServiceGalleryImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
 
@@ -207,7 +353,7 @@ class ServiceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Service
-        fields = ['id', 'title', 'description', 'icon', 'gallery_images', 'gallery_count', 'is_active']
+        fields = ['id', 'title', 'description', 'icon', 'order', 'gallery_images', 'gallery_count', 'is_active']
 
     def get_gallery_images(self, obj):
         request = self.context.get('request')
@@ -223,7 +369,7 @@ class TestimonialSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Testimonial
-        fields = ['id', 'name', 'role', 'quote', 'avatar', 'is_active']
+        fields = ['id', 'name', 'role', 'quote', 'avatar', 'order', 'is_active']
 
     def get_avatar(self, obj):
         request = self.context.get('request')
@@ -238,7 +384,7 @@ class TestimonialSerializer(serializers.ModelSerializer):
 class PortfolioCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = PortfolioCategory
-        fields = ['id', 'name', 'slug', 'is_active']
+        fields = ['id', 'name', 'slug', 'order', 'is_active']
 
 
 class PortfolioImageSerializer(serializers.ModelSerializer):
@@ -247,7 +393,7 @@ class PortfolioImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PortfolioImage
-        fields = ['id', 'url', 'category']
+        fields = ['id', 'url', 'category', 'order', 'is_active']
 
     def get_url(self, obj):
         request = self.context.get('request')
@@ -275,19 +421,19 @@ class StudioStatCreateUpdateSerializer(serializers.ModelSerializer):
 class ServiceCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
-        fields = ['title', 'description', 'icon']
+        fields = ['title', 'description', 'icon', 'order', 'is_active']
 
 
 class TestimonialCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Testimonial
-        fields = ['name', 'role', 'quote', 'avatar']
+        fields = ['name', 'role', 'quote', 'avatar', 'order', 'is_active']
 
 
 class PortfolioCategoryCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PortfolioCategory
-        fields = ['name']
+        fields = ['name', 'order', 'is_active']
         
     def validate_name(self, value):
         # Auto-generate slug from name
@@ -299,7 +445,7 @@ class MediaItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MediaItem
-        fields = ['id', 'title', 'media_type', 'url']
+        fields = ['id', 'title', 'media_type', 'url', 'order', 'is_active']
 
     def get_url(self, obj):
         request = self.context.get('request')
@@ -314,4 +460,55 @@ class MediaItemSerializer(serializers.ModelSerializer):
 class MediaItemCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = MediaItem
-        fields = ['title', 'media_type', 'file', 'order']
+        fields = ['title', 'media_type', 'file', 'order', 'is_active']
+
+
+class VideoCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VideoCategory
+        fields = ['id', 'name', 'slug', 'order', 'is_active']
+
+
+class VideoSerializer(serializers.ModelSerializer):
+    video_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    category = serializers.CharField(source='category.slug')
+    category_id = serializers.IntegerField(source='category.id', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
+    class Meta:
+        model = Video
+        fields = ['id', 'title', 'description', 'category', 'category_id', 'category_name', 'video_url', 'thumbnail_url', 'duration', 'year', 'order', 'views_count', 'is_active']
+
+    def get_video_url(self, obj):
+        request = self.context.get('request')
+        if obj.video_file:
+            url = obj.video_file.url
+            if url.startswith('http'):
+                return url
+            return request.build_absolute_uri(url) if request else url
+        return None
+
+    def get_thumbnail_url(self, obj):
+        request = self.context.get('request')
+        if obj.thumbnail:
+            url = obj.thumbnail.url
+            if url.startswith('http'):
+                return url
+            return request.build_absolute_uri(url) if request else url
+        return None
+
+
+# CRUD Serializers for Video Management
+class VideoCategoryCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VideoCategory
+        fields = ['name', 'order', 'is_active']
+
+
+class VideoCreateUpdateSerializer(serializers.ModelSerializer):
+    category = IntegerPrimaryKeyRelatedField(queryset=VideoCategory.objects.all())
+
+    class Meta:
+        model = Video
+        fields = ['title', 'description', 'category', 'video_file', 'thumbnail', 'duration', 'year', 'order', 'is_active']

@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.utils.text import slugify
 from django.contrib.auth.models import User
 
@@ -194,12 +195,57 @@ class PortfolioImage(models.Model):
         return f"{self.category.name} - {self.order}"
 
 
+class VideoCategory(models.Model):
+    """Categories for organizing video portfolio"""
+    name = models.CharField(max_length=50, unique=True)
+    # Force migration detection
+    slug = models.SlugField(unique=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name_plural = 'Video Categories'
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name.lower())
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
+class Video(models.Model):
+    """Video portfolio items with metadata"""
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    category = models.ForeignKey(VideoCategory, on_delete=models.CASCADE, related_name='videos')
+    video_file = models.FileField(upload_to='videos/%Y/%m/')
+    thumbnail = models.ImageField(upload_to='video_thumbnails/%Y/%m/', blank=True, null=True)
+    duration = models.CharField(max_length=20, blank=True, help_text="Duration in format like '3:45'")
+    year = models.PositiveIntegerField(blank=True, null=True)
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    views_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+        verbose_name_plural = 'Videos'
+
+    def __str__(self):
+        return f"{self.title} - {self.category.name}"
+
+
 class MediaItem(models.Model):
     MEDIA_TYPES = [
         ('image', 'Image'),
         ('video', 'Video'),
     ]
-    
+
     title = models.CharField(max_length=100, blank=True)
     media_type = models.CharField(max_length=10, choices=MEDIA_TYPES, default='image')
     file = models.FileField(upload_to='hero_media/%Y/%m/')
@@ -212,3 +258,55 @@ class MediaItem(models.Model):
 
     def __str__(self):
         return f"{self.media_type.title()} - {self.title or self.order}"
+
+
+class StudioContactInfo(models.Model):
+    phone = models.CharField(max_length=30, blank=True)
+    whatsapp_number = models.CharField(max_length=30, blank=True)
+    email = models.EmailField(blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    map_embed_url = models.URLField(blank=True, max_length=1024)
+    booking_link = models.URLField(blank=True)
+    office_hours = models.CharField(max_length=255, blank=True)
+    emergency_phone = models.CharField(max_length=30, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        verbose_name = 'Studio Contact Information'
+        verbose_name_plural = 'Studio Contact Information'
+        constraints = [
+            models.UniqueConstraint(
+                condition=Q(is_active=True),
+                fields=['is_active'],
+                name='unique_active_contact_info'
+            )
+        ]
+
+    def __str__(self):
+        identifier = self.phone or self.email or 'Contact Info'
+        return f"{identifier}"
+
+
+class SocialLink(models.Model):
+    contact_info = models.ForeignKey(
+        StudioContactInfo,
+        related_name='social_links',
+        on_delete=models.CASCADE
+    )
+    platform = models.CharField(max_length=50)
+    icon = models.CharField(max_length=50, default='FiLink')
+    url = models.URLField()
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'platform']
+        unique_together = ('contact_info', 'platform')
+
+    def __str__(self):
+        return f"{self.platform}"

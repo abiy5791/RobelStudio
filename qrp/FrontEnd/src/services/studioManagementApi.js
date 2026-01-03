@@ -9,13 +9,36 @@ function getAuthHeaders() {
   return headers
 }
 
+async function parseResponseBody(res) {
+  const text = await res.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch (error) {
+    return text
+  }
+}
+
+async function handleResponse(res, defaultMessage) {
+  const data = await parseResponseBody(res)
+  if (res.ok) {
+    return data
+  }
+  const errorMessage = defaultMessage || `Request failed with status ${res.status}`
+  const error = new Error(errorMessage)
+  error.response = {
+    status: res.status,
+    data,
+  }
+  throw error
+}
+
 // Studio Content Management
 export async function getStudioContent() {
   const res = await fetch(`${API_BASE}/api/manage/content/`, {
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to fetch studio content')
-  return res.json()
+  return handleResponse(res, 'Failed to fetch studio content')
 }
 
 export async function updateStudioContent(data) {
@@ -24,8 +47,24 @@ export async function updateStudioContent(data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to update studio content')
-  return res.json()
+  return handleResponse(res, 'Failed to update studio content')
+}
+
+// Studio Contact + Social Links Management
+export async function getStudioContactInfo() {
+  const res = await fetch(`${API_BASE}/api/manage/contact/`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse(res, 'Failed to fetch studio contact info')
+}
+
+export async function updateStudioContactInfo(data) {
+  const res = await fetch(`${API_BASE}/api/manage/contact/`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res, 'Failed to update studio contact info')
 }
 
 // Studio Stats Management
@@ -33,8 +72,7 @@ export async function getStudioStats() {
   const res = await fetch(`${API_BASE}/api/manage/stats/`, {
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to fetch studio stats')
-  const data = await res.json()
+  const data = await handleResponse(res, 'Failed to fetch studio stats')
   return Array.isArray(data) ? data : (data.results || [])
 }
 
@@ -44,8 +82,7 @@ export async function createStudioStat(data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to create studio stat')
-  return res.json()
+  return handleResponse(res, 'Failed to create studio stat')
 }
 
 export async function updateStudioStat(id, data) {
@@ -54,8 +91,7 @@ export async function updateStudioStat(id, data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to update studio stat')
-  return res.json()
+  return handleResponse(res, 'Failed to update studio stat')
 }
 
 export async function deleteStudioStat(id) {
@@ -63,7 +99,41 @@ export async function deleteStudioStat(id) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to delete studio stat')
+  await handleResponse(res, 'Failed to delete studio stat')
+}
+
+export async function getSocialLinks() {
+  const res = await fetch(`${API_BASE}/api/manage/social-links/`, {
+    headers: getAuthHeaders(),
+  })
+  const data = await handleResponse(res, 'Failed to fetch social links')
+  return Array.isArray(data) ? data : (data.results || [])
+}
+
+export async function createSocialLink(data) {
+  const res = await fetch(`${API_BASE}/api/manage/social-links/`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res, 'Failed to create social link')
+}
+
+export async function updateSocialLink(id, data) {
+  const res = await fetch(`${API_BASE}/api/manage/social-links/${id}/`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res, 'Failed to update social link')
+}
+
+export async function deleteSocialLink(id) {
+  const res = await fetch(`${API_BASE}/api/manage/social-links/${id}/`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  await handleResponse(res, 'Failed to delete social link')
 }
 
 // Services Management
@@ -71,8 +141,7 @@ export async function getServices() {
   const res = await fetch(`${API_BASE}/api/manage/services/`, {
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to fetch services')
-  const data = await res.json()
+  const data = await handleResponse(res, 'Failed to fetch services')
   return Array.isArray(data) ? data : (data.results || [])
 }
 
@@ -82,8 +151,7 @@ export async function createService(data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to create service')
-  return res.json()
+  return handleResponse(res, 'Failed to create service')
 }
 
 export async function updateService(id, data) {
@@ -92,8 +160,7 @@ export async function updateService(id, data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to update service')
-  return res.json()
+  return handleResponse(res, 'Failed to update service')
 }
 
 export async function deleteService(id) {
@@ -101,7 +168,7 @@ export async function deleteService(id) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to delete service')
+  await handleResponse(res, 'Failed to delete service')
 }
 
 // Testimonials Management
@@ -109,8 +176,7 @@ export async function getTestimonials() {
   const res = await fetch(`${API_BASE}/api/manage/testimonials/`, {
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to fetch testimonials')
-  const data = await res.json()
+  const data = await handleResponse(res, 'Failed to fetch testimonials')
   return Array.isArray(data) ? data : (data.results || [])
 }
 
@@ -126,8 +192,7 @@ export async function createTestimonial(formData) {
     headers,
     body: formData,
   })
-  if (!res.ok) throw new Error('Failed to create testimonial')
-  return res.json()
+  return handleResponse(res, 'Failed to create testimonial')
 }
 
 export async function updateTestimonial(id, formData) {
@@ -142,8 +207,7 @@ export async function updateTestimonial(id, formData) {
     headers,
     body: formData,
   })
-  if (!res.ok) throw new Error('Failed to update testimonial')
-  return res.json()
+  return handleResponse(res, 'Failed to update testimonial')
 }
 
 export async function deleteTestimonial(id) {
@@ -151,7 +215,7 @@ export async function deleteTestimonial(id) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to delete testimonial')
+  await handleResponse(res, 'Failed to delete testimonial')
 }
 
 // Portfolio Categories Management
@@ -159,8 +223,7 @@ export async function getPortfolioCategories() {
   const res = await fetch(`${API_BASE}/api/manage/categories/`, {
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to fetch categories')
-  const data = await res.json()
+  const data = await handleResponse(res, 'Failed to fetch categories')
   return Array.isArray(data) ? data : (data.results || [])
 }
 
@@ -170,8 +233,7 @@ export async function createPortfolioCategory(data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to create category')
-  return res.json()
+  return handleResponse(res, 'Failed to create category')
 }
 
 export async function updatePortfolioCategory(id, data) {
@@ -180,8 +242,7 @@ export async function updatePortfolioCategory(id, data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to update category')
-  return res.json()
+  return handleResponse(res, 'Failed to update category')
 }
 
 export async function deletePortfolioCategory(id) {
@@ -189,7 +250,7 @@ export async function deletePortfolioCategory(id) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to delete category')
+  await handleResponse(res, 'Failed to delete category')
 }
 
 // Portfolio Images Management
@@ -198,8 +259,7 @@ export async function getPortfolioImages(categoryId = null) {
   const res = await fetch(`${API_BASE}/api/manage/portfolio/${params}`, {
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to fetch portfolio images')
-  const data = await res.json()
+  const data = await handleResponse(res, 'Failed to fetch portfolio images')
   return Array.isArray(data) ? data : (data.results || [])
 }
 
@@ -208,7 +268,7 @@ export async function deletePortfolioImage(id) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to delete portfolio image')
+  await handleResponse(res, 'Failed to delete portfolio image')
 }
 
 export async function updatePortfolioImage(id, data) {
@@ -217,8 +277,7 @@ export async function updatePortfolioImage(id, data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to update portfolio image')
-  return res.json()
+  return handleResponse(res, 'Failed to update portfolio image')
 }
 
 // Service Gallery Management
@@ -227,8 +286,7 @@ export async function getServiceGalleryImages(serviceId = null) {
   const res = await fetch(`${API_BASE}/api/manage/service-gallery/${params}`, {
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to fetch service gallery images')
-  const data = await res.json()
+  const data = await handleResponse(res, 'Failed to fetch service gallery images')
   return Array.isArray(data) ? data : (data.results || [])
 }
 
@@ -237,7 +295,7 @@ export async function deleteServiceGalleryImage(id) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to delete service gallery image')
+  await handleResponse(res, 'Failed to delete service gallery image')
 }
 
 export async function updateServiceGalleryImage(id, data) {
@@ -246,8 +304,7 @@ export async function updateServiceGalleryImage(id, data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to update service gallery image')
-  return res.json()
+  return handleResponse(res, 'Failed to update service gallery image')
 }
 
 // Bulk Upload Functions (reuse existing)
@@ -342,8 +399,7 @@ export async function getMediaItems() {
   const res = await fetch(`${API_BASE}/api/manage/media-items/`, {
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to fetch media items')
-  const data = await res.json()
+  const data = await handleResponse(res, 'Failed to fetch media items')
   return Array.isArray(data) ? data : (data.results || [])
 }
 
@@ -359,8 +415,7 @@ export async function createMediaItem(formData) {
     headers,
     body: formData,
   })
-  if (!res.ok) throw new Error('Failed to create media item')
-  return res.json()
+  return handleResponse(res, 'Failed to create media item')
 }
 
 export async function deleteMediaItem(id) {
@@ -368,7 +423,7 @@ export async function deleteMediaItem(id) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   })
-  if (!res.ok) throw new Error('Failed to delete media item')
+  await handleResponse(res, 'Failed to delete media item')
 }
 
 export async function updateMediaItem(id, data) {
@@ -377,6 +432,144 @@ export async function updateMediaItem(id, data) {
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error('Failed to update media item')
-  return res.json()
+  return handleResponse(res, 'Failed to update media item')
+}
+
+// Video Categories Management
+export async function getVideoCategories() {
+  const res = await fetch(`${API_BASE}/api/manage/video-categories/`, {
+    headers: getAuthHeaders(),
+  })
+  const data = await handleResponse(res, 'Failed to fetch video categories')
+  return Array.isArray(data) ? data : (data.results || [])
+}
+
+export async function createVideoCategory(data) {
+  const res = await fetch(`${API_BASE}/api/manage/video-categories/`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res, 'Failed to create video category')
+}
+
+export async function updateVideoCategory(id, data) {
+  const res = await fetch(`${API_BASE}/api/manage/video-categories/${id}/`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res, 'Failed to update video category')
+}
+
+export async function deleteVideoCategory(id) {
+  const res = await fetch(`${API_BASE}/api/manage/video-categories/${id}/`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  await handleResponse(res, 'Failed to delete video category')
+}
+
+// Videos Management
+export async function getVideos(categoryId = null) {
+  const params = categoryId ? `?category_id=${categoryId}` : ''
+  const res = await fetch(`${API_BASE}/api/manage/videos/${params}`, {
+    headers: getAuthHeaders(),
+  })
+  const data = await handleResponse(res, 'Failed to fetch videos')
+  return Array.isArray(data) ? data : (data.results || [])
+}
+
+export async function createVideo(formData) {
+  const token = localStorage.getItem('access_token')
+  const headers = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const res = await fetch(`${API_BASE}/api/manage/videos/`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  })
+  return handleResponse(res, 'Failed to create video')
+}
+
+export async function updateVideo(id, formData) {
+  const token = localStorage.getItem('access_token')
+  const headers = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const res = await fetch(`${API_BASE}/api/manage/videos/${id}/`, {
+    method: 'PATCH',
+    headers,
+    body: formData,
+  })
+  return handleResponse(res, 'Failed to update video')
+}
+
+export async function deleteVideo(id) {
+  const res = await fetch(`${API_BASE}/api/manage/videos/${id}/`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  await handleResponse(res, 'Failed to delete video')
+}
+
+// Bulk Upload Videos
+export async function bulkUploadVideos(categoryId, videoFiles, thumbnailFilesOrProgress, maybeOnProgress) {
+  let thumbnailFiles = thumbnailFilesOrProgress
+  let onProgress = maybeOnProgress
+
+  // Allow callers that only pass (categoryId, files, onProgress)
+  if (typeof thumbnailFilesOrProgress === 'function') {
+    onProgress = thumbnailFilesOrProgress
+    thumbnailFiles = []
+  }
+
+  return new Promise((resolve, reject) => {
+    const formData = new FormData()
+    formData.append('category_id', categoryId)
+    videoFiles.forEach(file => formData.append('videos', file))
+    if (Array.isArray(thumbnailFiles) && thumbnailFiles.length > 0) {
+      thumbnailFiles.forEach(file => formData.append('thumbnails', file))
+    }
+
+    const xhr = new XMLHttpRequest()
+
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = Math.round((e.loaded / e.total) * 100)
+          onProgress(percentComplete)
+        }
+      })
+    }
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText)
+          resolve(data)
+        } catch (err) {
+          reject(new Error('Failed to parse response'))
+        }
+      } else {
+        reject(new Error(`Upload failed (${xhr.status})`))
+      }
+    })
+
+    xhr.addEventListener('error', () => {
+      reject(new Error('Upload failed'))
+    })
+
+    const token = localStorage.getItem('access_token')
+    xhr.open('POST', `${API_BASE}/api/uploads/videos/`)
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    }
+    xhr.send(formData)
+  })
 }

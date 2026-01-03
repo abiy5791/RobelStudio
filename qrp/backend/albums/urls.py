@@ -1,16 +1,19 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
-    AlbumCreateView, AlbumDetailView, GuestMessageCreateView, 
-    UploadImagesView, DownloadPhotoView, DownloadAlbumZipView, 
+    AlbumCreateView, AlbumDetailView, GuestMessageCreateView,
+    UploadImagesView, DownloadPhotoView, DownloadAlbumZipView,
     PhotoLikeView, MyAlbumsView, StudioDataView, BulkUploadPortfolioImagesView,
     BulkUploadServiceImagesView, StudioContentManageView, StudioStatManageView,
-    StudioStatDetailManageView, ServiceManageView, ServiceDetailManageView, 
+    StudioStatDetailManageView, ServiceManageView, ServiceDetailManageView,
     TestimonialManageView, TestimonialDetailManageView,
     PortfolioCategoryManageView, PortfolioCategoryDetailManageView,
     PortfolioImageManageView, PortfolioImageDetailManageView,
     ServiceGalleryImageManageView, ServiceGalleryImageDetailManageView,
-    MediaItemManageView, MediaItemDetailManageView
+    MediaItemManageView, MediaItemDetailManageView,
+    VideoCategoryManageView, VideoCategoryDetailManageView, VideoManageView,
+    VideoDetailManageView, BulkUploadVideosView,
+    StudioContactManageView, SocialLinkManageView, SocialLinkDetailManageView,
 )
 from .auth_views import RegisterView, LoginView, UserProfileView
 
@@ -40,8 +43,11 @@ urlpatterns = [
     
     # Studio management endpoints
     path('manage/content/', StudioContentManageView.as_view(), name='manage-content'),
+    path('manage/contact/', StudioContactManageView.as_view(), name='manage-contact'),
     path('manage/stats/', StudioStatManageView.as_view(), name='manage-stats'),
     path('manage/stats/<int:pk>/', StudioStatDetailManageView.as_view(), name='manage-stat-detail'),
+    path('manage/social-links/', SocialLinkManageView.as_view(), name='manage-social-links'),
+    path('manage/social-links/<int:pk>/', SocialLinkDetailManageView.as_view(), name='manage-social-link-detail'),
     path('manage/services/', ServiceManageView.as_view(), name='manage-services'),
     path('manage/services/<int:pk>/', ServiceDetailManageView.as_view(), name='manage-service-detail'),
     path('manage/testimonials/', TestimonialManageView.as_view(), name='manage-testimonials'),
@@ -54,4 +60,9 @@ urlpatterns = [
     path('manage/service-gallery/<int:pk>/', ServiceGalleryImageDetailManageView.as_view(), name='manage-service-gallery-detail'),
     path('manage/media-items/', MediaItemManageView.as_view(), name='manage-media-items'),
     path('manage/media-items/<int:pk>/', MediaItemDetailManageView.as_view(), name='manage-media-items-detail'),
+    path('manage/video-categories/', VideoCategoryManageView.as_view(), name='manage-video-categories'),
+    path('manage/video-categories/<int:pk>/', VideoCategoryDetailManageView.as_view(), name='manage-video-category-detail'),
+    path('manage/videos/', VideoManageView.as_view(), name='manage-videos'),
+    path('manage/videos/<int:pk>/', VideoDetailManageView.as_view(), name='manage-video-detail'),
+    path('uploads/videos/', BulkUploadVideosView.as_view(), name='bulk-upload-videos'),
 ]

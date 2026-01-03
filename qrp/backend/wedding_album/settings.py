@@ -138,7 +138,7 @@ REST_FRAMEWORK = {
 
 # Frontend URL for QR codes - ensure full URLs for mobile QR scanning
 
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://robel-studio.vercel.app' if not DEBUG else 'http://localhost:5173')
 
 # JWT Settings
 from datetime import timedelta
