@@ -33,6 +33,66 @@ async function handleResponse(res, defaultMessage) {
   throw error
 }
 
+function uploadWithProgress({ url, method = 'POST', formData, defaultMessage, onProgress }) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open(method, url)
+
+    const token = localStorage.getItem('access_token')
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    }
+
+    if (xhr.upload && typeof onProgress === 'function') {
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) {
+          onProgress(1)
+          return
+        }
+        const percent = Math.min(100, Math.max(1, Math.round((event.loaded / event.total) * 100)))
+        onProgress(percent)
+      }
+    }
+
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState !== XMLHttpRequest.DONE) return
+      const responseText = xhr.responseText
+      let data = null
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText)
+        } catch (error) {
+          data = responseText
+        }
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data)
+        return
+      }
+
+      const errorMessage = defaultMessage || `Request failed with status ${xhr.status}`
+      const error = new Error(errorMessage)
+      error.response = {
+        status: xhr.status,
+        data,
+      }
+      reject(error)
+    }
+
+    xhr.onerror = () => {
+      const error = new Error(defaultMessage || 'Network error during upload')
+      reject(error)
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress(1)
+    }
+
+    xhr.send(formData)
+  })
+}
+
 // Studio Content Management
 export async function getStudioContent() {
   const res = await fetch(`${API_BASE}/api/manage/content/`, {
@@ -480,34 +540,24 @@ export async function getVideos(categoryId = null) {
   return Array.isArray(data) ? data : (data.results || [])
 }
 
-export async function createVideo(formData) {
-  const token = localStorage.getItem('access_token')
-  const headers = {}
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
-  const res = await fetch(`${API_BASE}/api/manage/videos/`, {
+export async function createVideo(formData, onProgress) {
+  return uploadWithProgress({
+    url: `${API_BASE}/api/manage/videos/`,
     method: 'POST',
-    headers,
-    body: formData,
+    formData,
+    defaultMessage: 'Failed to create video',
+    onProgress,
   })
-  return handleResponse(res, 'Failed to create video')
 }
 
-export async function updateVideo(id, formData) {
-  const token = localStorage.getItem('access_token')
-  const headers = {}
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
-  const res = await fetch(`${API_BASE}/api/manage/videos/${id}/`, {
+export async function updateVideo(id, formData, onProgress) {
+  return uploadWithProgress({
+    url: `${API_BASE}/api/manage/videos/${id}/`,
     method: 'PATCH',
-    headers,
-    body: formData,
+    formData,
+    defaultMessage: 'Failed to update video',
+    onProgress,
   })
-  return handleResponse(res, 'Failed to update video')
 }
 
 export async function deleteVideo(id) {

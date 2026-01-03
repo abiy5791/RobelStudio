@@ -881,7 +881,17 @@ export default function StudioManagementPage() {
       notifyError("Please select a video category");
       return;
     }
-    setVideoUploadProgress(0);
+
+    const handleProgressUpdate = (percent) => {
+      if (typeof percent !== "number" || Number.isNaN(percent)) {
+        setVideoUploadProgress((prev) => (prev > 0 ? prev : 1));
+        return;
+      }
+      const normalized = Math.min(100, Math.max(1, percent));
+      setVideoUploadProgress(normalized);
+    };
+
+    setVideoUploadProgress(1);
     try {
       const formData = new FormData();
       formData.append("title", videoForm.title);
@@ -899,12 +909,14 @@ export default function StudioManagementPage() {
       }
 
       if (editingVideo) {
-        await updateVideo(editingVideo.id, formData);
+        await updateVideo(editingVideo.id, formData, handleProgressUpdate);
         toast.success("Video updated successfully");
       } else {
-        await createVideo(formData);
+        await createVideo(formData, handleProgressUpdate);
         toast.success("Video created successfully");
       }
+
+      setVideoUploadProgress(100);
 
       setEditingVideo(null);
       setVideoForm({
@@ -4179,15 +4191,6 @@ export default function StudioManagementPage() {
                                 {video.is_active ? "● Live" : "○ Draft"}
                               </span>
                             </div>
-
-                            {/* Order Badge */}
-                            {video.order && (
-                              <div className="absolute top-4 left-4 z-10">
-                                <span className="px-2.5 py-1.5 rounded-lg bg-black/20 dark:bg-white/20 backdrop-blur-sm text-xs font-bold text-white dark:text-slate-900">
-                                  #{video.order}
-                                </span>
-                              </div>
-                            )}
 
                             {/* Thumbnail Section */}
                             <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
