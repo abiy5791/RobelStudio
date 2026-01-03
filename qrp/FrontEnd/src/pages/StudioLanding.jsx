@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   FiArrowRight,
   FiPlay,
@@ -41,7 +41,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { fetchStudioData } from "../services/studioApi";
 
 import { formatNumber } from "../utils/numberUtils";
-import { sanitizeAlbumId, validateAlbumId } from "../utils/albumUtils";
+import { validateAlbumId } from "../utils/albumUtils";
 
 const SERVICE_ICON_MAP = {
   FiCamera,
@@ -192,8 +192,6 @@ const generateFallbackMedia = (portfolio) => {
 };
 
 export default function StudioLanding() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -265,21 +263,29 @@ export default function StudioLanding() {
   const videoRef = useRef(null);
   const selectedVideoPlayerRef = useRef(null);
   const heroSectionRef = useRef(null);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const albumId = searchParams.get("album") || searchParams.get("albums");
+  const validAlbumId = validateAlbumId(albumId) ? albumId : null;
 
-  const validAlbumId = useMemo(() => {
-    const searchKeys = ["album", "album_id", "slug"];
-    for (const key of searchKeys) {
-      const rawValue = searchParams.get(key);
-      if (!rawValue) {
-        continue;
-      }
-      const trimmedValue = rawValue.trim();
-      if (validateAlbumId(trimmedValue)) {
-        return trimmedValue;
-      }
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
     }
-    return null;
-  }, [searchParams]);
+    if (!albumId || validAlbumId) {
+      return undefined;
+    }
+
+    const newSearchParams = new URLSearchParams(window.location.search);
+    newSearchParams.delete("album");
+    newSearchParams.delete("albums");
+    const queryString = newSearchParams.toString();
+    const newUrl = `${window.location.pathname}${
+      queryString ? `?${queryString}` : ""
+    }`;
+    window.history.replaceState({}, "", newUrl);
+    return undefined;
+  }, [albumId, validAlbumId]);
 
   const fallbackMedia = useMemo(
     () => generateFallbackMedia(studioData.portfolio),
@@ -596,18 +602,6 @@ export default function StudioLanding() {
     setRefreshing(false);
   }, [loadStudioData]);
 
-  const handleViewAlbum = useCallback(() => {
-    if (!validAlbumId || albumLoading) {
-      return;
-    }
-    const sanitizedId = sanitizeAlbumId(validAlbumId);
-    if (!sanitizedId) {
-      return;
-    }
-    setAlbumLoading(true);
-    navigate(`/albums/${sanitizedId}`);
-  }, [albumLoading, navigate, validAlbumId]);
-
   useEffect(() => {
     loadStudioData();
   }, [loadStudioData]);
@@ -771,11 +765,6 @@ export default function StudioLanding() {
         phone: "",
         serviceType: "",
         projectDetails: "",
-        fullName: "",
-        email: "",
-        phone: "",
-        serviceType: "",
-        projectDetails: "",
       });
       setFormStatus({
         type: "success",
@@ -874,6 +863,27 @@ export default function StudioLanding() {
     setZoomLevel(1);
     setPanX(0);
     setPanY(0);
+  };
+
+  const handleViewAlbum = async () => {
+    if (!validAlbumId || albumLoading) {
+      return;
+    }
+
+    setAlbumLoading(true);
+    try {
+      const sanitizedId = encodeURIComponent(validAlbumId);
+      navigate(`/albums/${sanitizedId}?from=qr`);
+    } catch (error) {
+      console.error("Navigation error:", error);
+      if (typeof window !== "undefined") {
+        window.location.href = `/albums/${encodeURIComponent(
+          validAlbumId
+        )}?from=qr`;
+      }
+    } finally {
+      setAlbumLoading(false);
+    }
   };
 
   return (
@@ -1099,6 +1109,52 @@ export default function StudioLanding() {
         ref={heroSectionRef}
         className="relative min-h-screen flex items-center justify-center overflow-hidden"
       >
+        {validAlbumId && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="hidden md:block fixed top-20 left-1/2 -translate-x-1/2 z-40"
+          >
+            <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 ml-14 py-2 mt-4 rounded-full shadow-lg border border-white/20 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <FiImage size={16} />
+                <span className="text-sm font-medium">Album ready to view</span>
+                <button
+                  onClick={handleViewAlbum}
+                  disabled={albumLoading}
+                  className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {albumLoading ? "Loading..." : "View Now"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {validAlbumId && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="md:hidden fixed top-20 left-1/2 -translate-x-1/2 z-40 w-4/5"
+          >
+            <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-3 py-2 mt-4 rounded-full shadow-lg border border-white/20 backdrop-blur-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <FiImage size={16} />
+                  <span className="text-sm font-medium">Album ready to view</span>
+                </div>
+                <button
+                  onClick={handleViewAlbum}
+                  disabled={albumLoading}
+                  className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {albumLoading ? "Loading..." : "View Now"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         <div className="absolute inset-0 z-0">
           {currentMedia ? (
             currentMedia.media_type === "image" ? (
@@ -1158,25 +1214,6 @@ export default function StudioLanding() {
 
         {/* Hero Content - Bottom */}
         <div className="absolute bottom-8 left-0 right-0 z-10 text-center px-4 max-w-4xl mx-auto">
-          {/* QR Album Access - Mobile Bottom Button */}
-          {/* {validAlbumId && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="md:hidden mb-6"
-            >
-              <button
-                onClick={handleViewAlbum}
-                disabled={albumLoading}
-                className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-8 py-4 rounded-full font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center gap-3 mx-auto disabled:opacity-50 border-2 border-white/30"
-                aria-label="View Album"
-              >
-                <FiImage size={20} />
-                {albumLoading ? "Loading Album..." : "View Album"}
-                <FiArrowRight size={20} />
-              </button>
-            </motion.div>
-          )} */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
