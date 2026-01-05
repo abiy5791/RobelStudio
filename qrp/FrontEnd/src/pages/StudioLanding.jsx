@@ -63,8 +63,18 @@ const DEFAULT_HERO_MEDIA = [
 ];
 
 const DEFAULT_STATS = [
-  { icon: SERVICE_ICON_MAP.FiUsers, value: 0, suffix: "+", label: "Happy Clients" },
-  { icon: SERVICE_ICON_MAP.FiCamera, value: 0, suffix: "+", label: "Years Experience" },
+  {
+    icon: SERVICE_ICON_MAP.FiUsers,
+    value: 0,
+    suffix: "+",
+    label: "Happy Clients",
+  },
+  {
+    icon: SERVICE_ICON_MAP.FiCamera,
+    value: 0,
+    suffix: "+",
+    label: "Years Experience",
+  },
   { icon: FiAward, value: 0, suffix: "+", label: "Awards Won" },
   { icon: FiHeart, value: 0, suffix: "+", label: "Moments Captured" },
 ];
@@ -293,7 +303,10 @@ export default function StudioLanding() {
   );
 
   const mediaItems = useMemo(() => {
-    if (Array.isArray(studioData.media_items) && studioData.media_items.length) {
+    if (
+      Array.isArray(studioData.media_items) &&
+      studioData.media_items.length
+    ) {
       return studioData.media_items;
     }
     return fallbackMedia;
@@ -312,9 +325,7 @@ export default function StudioLanding() {
     const base = ["all"];
     if (Array.isArray(studioData.categories)) {
       base.push(
-        ...studioData.categories
-          .map((cat) => cat?.slug)
-          .filter(Boolean)
+        ...studioData.categories.map((cat) => cat?.slug).filter(Boolean)
       );
     }
     return Array.from(new Set(base));
@@ -612,8 +623,10 @@ export default function StudioLanding() {
     }
 
     const updateScrollState = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+      const scrollTop =
+        window.pageYOffset || document.documentElement.scrollTop;
+      const windowHeight =
+        window.innerHeight || document.documentElement.clientHeight;
       const docHeight = document.documentElement.scrollHeight;
 
       setIsAtBottom(scrollTop + windowHeight >= docHeight - 100);
@@ -637,7 +650,10 @@ export default function StudioLanding() {
   }, []);
 
   useEffect(() => {
-    if (!heroSectionRef.current || typeof IntersectionObserver === "undefined") {
+    if (
+      !heroSectionRef.current ||
+      typeof IntersectionObserver === "undefined"
+    ) {
       return undefined;
     }
 
@@ -1099,7 +1115,9 @@ export default function StudioLanding() {
             }`}
           >
             <span className="w-2.5 h-2.5 rounded-full bg-pink-500 animate-pulse" />
-            <span>{loading ? "Loading studio data" : "Refreshing content"}</span>
+            <span>
+              {loading ? "Loading studio data" : "Refreshing content"}
+            </span>
           </div>
         </div>
       )}
@@ -1141,7 +1159,9 @@ export default function StudioLanding() {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <FiImage size={16} />
-                  <span className="text-sm font-medium">Album ready to view</span>
+                  <span className="text-sm font-medium">
+                    Album ready to view
+                  </span>
                 </div>
                 <button
                   onClick={handleViewAlbum}
@@ -1254,28 +1274,29 @@ export default function StudioLanding() {
               link.platform
             );
             const href = link.url || link.href || "#";
-            const label = link.platform || link.label || `Social Link ${idx + 1}`;
+            const label =
+              link.platform || link.label || `Social Link ${idx + 1}`;
             return (
-            <motion.a
-              key={`${label}-${href}`}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.7 + idx * 0.1 }}
-              className={`group w-10 h-10 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-pink-600 hover:scale-110 transition-all duration-300 hover:border-pink-500 ${
-                isDarkMode
-                  ? "bg-white/10 text-white border border-white/20"
-                  : "bg-slate-800/80 text-white border border-slate-700/50 shadow-lg"
-              }`}
-              aria-label={label}
-            >
-              <IconComponent
-                size={18}
-                className="group-hover:scale-110 transition-transform duration-300"
-              />
-            </motion.a>
+              <motion.a
+                key={`${label}-${href}`}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.7 + idx * 0.1 }}
+                className={`group w-10 h-10 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-pink-600 hover:scale-110 transition-all duration-300 hover:border-pink-500 ${
+                  isDarkMode
+                    ? "bg-white/10 text-white border border-white/20"
+                    : "bg-slate-800/80 text-white border border-slate-700/50 shadow-lg"
+                }`}
+                aria-label={label}
+              >
+                <IconComponent
+                  size={18}
+                  className="group-hover:scale-110 transition-transform duration-300"
+                />
+              </motion.a>
             );
           })}
         </motion.div>
@@ -1409,9 +1430,14 @@ export default function StudioLanding() {
               {studioData.content?.about_title ||
                 "Crafting stories through the lens"}
             </h2>
-            <p className="max-w-2xl text-slate-700 dark:text-slate-400 text-lg leading-relaxed mx-auto transition-colors duration-300">
-              {studioData.content?.about_text ||
-                "Founded in 2018 in Addis Ababa, Robel Studio combines professional videography and photography expertise to create content that drives real business results. We specialize in video-first storytelling that engages audiences and delivers measurable ROI for our clients."}
+              <p
+              className={`max-w-2xl text-lg leading-relaxed mx-auto transition-colors duration-300 ${
+                isDarkMode ? "text-slate-400" : "text-slate-700"
+              }`}
+            >
+              Robel Studio is dedicated to capturing authentic moments, real
+              emotions, and timeless memories—beautifully preserved for a
+              lifetime.
             </p>
           </motion.div>
 
@@ -1533,18 +1559,8 @@ export default function StudioLanding() {
                   isDarkMode ? "text-slate-300" : "text-slate-500"
                 }`}
               >
-                At Robel Studio, we believe every moment tells a story. Since
-                our founding in 2018, we've been dedicated to preserving life's
-                most precious memories through the art of photography.
-              </p>
-              <p
-                className={`leading-relaxed mb-8 transition-colors duration-300 ${
-                  isDarkMode ? "text-slate-300" : "text-slate-500"
-                }`}
-              >
-                Our team combines technical expertise with creative vision to
-                deliver stunning imagery that captures not just how you looked,
-                but how you felt in those special moments.
+                {studioData.content?.about_text &&
+                  "At Robel Studio, we believe that every moment tells a story worth preserving. Photography is more than just taking pictures—it’s about capturing genuine emotions, meaningful details, and fleeting moments that become lifelong memories."}
               </p>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-pink-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
@@ -1596,7 +1612,11 @@ export default function StudioLanding() {
                 >
                   {stat.number}
                 </div>
-                <div className="text-slate-700 dark:text-slate-400 text-sm transition-colors duration-300">
+                <div
+                  className={`max-w-2xl text-lg leading-relaxed mx-auto transition-colors duration-300 ${
+                    isDarkMode ? "text-slate-400" : "text-slate-700"
+                  }`}
+                >
                   {stat.label}
                 </div>
               </motion.div>
@@ -1604,206 +1624,6 @@ export default function StudioLanding() {
           </motion.div>
         </div>
       </section>
-
-      {/* Video Portfolio - Full Screen Modal */}
-      {showAllVideos && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4"
-          onClick={() => setShowAllVideos(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="relative w-full max-w-7xl mx-auto bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-700/50 overflow-hidden max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-700/50 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold text-white font-display">
-                    Complete Video Portfolio
-                  </h3>
-                  <p className="text-slate-400 text-sm mt-1">
-                    Explore our professional video productions across different
-                    industries
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowAllVideos(false)}
-                  className="w-10 h-10 bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-                >
-                  <FiX size={20} />
-                </button>
-              </div>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] custom-scrollbar">
-              {/* Video Filter Buttons */}
-              <div className="flex justify-center gap-3 mb-8 flex-wrap">
-                {[
-                  { key: "all", label: "All Videos" },
-                  ...(studioData.video_categories?.map((cat) => ({
-                    key: cat.slug,
-                    label: cat.name,
-                  })) || []),
-                ].map((cat) => (
-                  <motion.button
-                    key={cat.key}
-                    onClick={() => setVideoFilter(cat.key)}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.3 }}
-                    className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${
-                      videoFilter === cat.key
-                        ? "bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-600/25"
-                        : "bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:shadow-md"
-                    }`}
-                  >
-                    {cat.label}
-                  </motion.button>
-                ))}
-              </div>
-
-              {/* Video Gallery Grid */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true }}
-                className="relative"
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
-                  {filteredVideos.map((video, idx) => (
-                    <motion.div
-                      key={video.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.4, delay: idx * 0.05 }}
-                      whileHover={{ y: -4 }}
-                      className="group cursor-pointer"
-                      onClick={() => setSelectedVideo(video)}
-                    >
-                      {/* Card Container */}
-                      <div className="overflow-hidden rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-300">
-                        {/* Thumbnail Container */}
-                        <div className="relative aspect-video overflow-hidden bg-slate-100 dark:bg-slate-800">
-                          {video.thumbnail_url ? (
-                            <>
-                              <img
-                                src={video.thumbnail_url}
-                                alt={video.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                loading="lazy"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                            </>
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center">
-                                <FiPlay size={24} className="text-white ml-1" />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Category Badge */}
-                          <div className="absolute top-1 left-3">
-                            <span className="text-xs font-medium px-2 py-1 bg-black/70 text-white rounded">
-                              {video.category.replace("-", " ").toUpperCase()}
-                            </span>
-                          </div>
-
-                          {/* Duration Badge */}
-                          {video.duration && (
-                            <div className="absolute bottom-3 right-3">
-                              <span className="text-xs font-medium px-2 py-1 bg-black/70 text-white rounded">
-                                {video.duration}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Play Overlay */}
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <div className="w-14 h-14 bg-white/90 dark:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                              <FiPlay
-                                size={20}
-                                className="text-slate-900 dark:text-white ml-1"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Content Section */}
-                        <div className="p-4">
-                          <h4 className="font-semibold text-slate-900 dark:text-white mb-2 line-clamp-2 leading-tight">
-                            {video.title}
-                          </h4>
-
-                          {/* Metadata */}
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-4 text-slate-600 dark:text-slate-400">
-                              {video.views && (
-                                <div className="flex items-center gap-1.5">
-                                  <FiEye size={14} />
-                                  <span>{video.views}</span>
-                                </div>
-                              )}
-
-                              {video.year && (
-                                <div className="flex items-center gap-1.5">
-                                  <FiCalendar size={14} />
-                                  <span>{video.year}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-
-                {/* Loading State */}
-                {/* {filteredVideos.length === 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
-                    {[...Array(8)].map((_, idx) => (
-                      <div key={idx} className="animate-pulse">
-                        <div className="aspect-video bg-slate-200 dark:bg-slate-800 rounded-xl mb-4" />
-                        <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded mb-2" />
-                        <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
-                      </div>
-                    ))}
-                  </div>
-                )} */}
-                {filteredVideos.length === 0 && (
-                  <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-                    <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200">
-                      Nothing here yet
-                    </h2>
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      We couldn’t find any matching videos.
-                    </p>
-                  </div>
-                )}
-              </motion.div>
-
-              {/* Video Count & CTA */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="text-center mt-12 text-sm text-white font-display"
-              >
-                {filteredVideos.length} Videos Available
-              </motion.div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
 
       {/* Services */}
       <section id="services" className="section-padding">
@@ -1830,7 +1650,11 @@ export default function StudioLanding() {
             >
               What we offer
             </h2>
-            <p className="max-w-2xl text-slate-700 dark:text-slate-400 text-lg leading-relaxed mx-auto transition-colors duration-300">
+            <p
+              className={`max-w-2xl text-lg leading-relaxed mx-auto transition-colors duration-300 ${
+                isDarkMode ? "text-slate-400" : "text-slate-700"
+              }`}
+            >
               Professional photography services tailored to capture your most
               important moments
             </p>
@@ -1976,6 +1800,7 @@ export default function StudioLanding() {
             >
               Portfolio
             </span>
+
             <h2
               className={`text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl leading-tight font-display mb-4 transition-colors duration-300 ${
                 isDarkMode ? "text-white" : "text-slate-900"
@@ -1983,7 +1808,11 @@ export default function StudioLanding() {
             >
               Our recent work
             </h2>
-            <p className="max-w-2xl text-slate-700 dark:text-slate-400 text-lg leading-relaxed mx-auto transition-colors duration-300">
+            <p
+              className={`max-w-2xl text-lg leading-relaxed mx-auto transition-colors duration-300 ${
+                isDarkMode ? "text-slate-400" : "text-slate-700"
+              }`}
+            >
               A collection of our favorite moments captured through our lens
             </p>
           </motion.div>
@@ -2053,6 +1882,240 @@ export default function StudioLanding() {
         </div>
       </section>
 
+      {/* Video Portfolio - Full Screen Modal */}
+      {showAllVideos && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className={`fixed inset-0 z-50 backdrop-blur-xl flex items-center justify-center p-4 ${
+            isDarkMode ? "bg-slate-950/95" : "bg-slate-50/95"
+          }`}
+          onClick={() => setShowAllVideos(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className={`relative w-full max-w-7xl mx-auto backdrop-blur-md rounded-2xl border overflow-hidden max-h-[90vh] ${
+              isDarkMode
+                ? "bg-slate-900/50 border-slate-700/50"
+                : "bg-white/90 border-slate-200 shadow-2xl"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`sticky top-0 z-10 backdrop-blur-md border-b p-6 ${
+                isDarkMode
+                  ? "bg-slate-900/80 border-slate-700/50"
+                  : "bg-white/95 border-slate-200"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3
+                    className={`text-xl font-semibold font-display ${
+                      isDarkMode ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    Complete Video Portfolio
+                  </h3>
+                  <p
+                    className={`text-sm mt-1 ${
+                      isDarkMode ? "text-slate-400" : "text-slate-600"
+                    }`}
+                  >
+                    Explore our professional video productions across different
+                    industries
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAllVideos(false)}
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                    isDarkMode
+                      ? "bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700"
+                      : "bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200"
+                  }`}
+                >
+                  <FiX size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] custom-scrollbar">
+              {/* Video Filter Buttons */}
+              <div className="flex justify-center gap-3 mb-8 flex-wrap">
+                {[
+                  { key: "all", label: "All Videos" },
+                  ...(studioData.video_categories?.map((cat) => ({
+                    key: cat.slug,
+                    label: cat.name,
+                  })) || []),
+                ].map((cat) => (
+                  <motion.button
+                    key={cat.key}
+                    onClick={() => setVideoFilter(cat.key)}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.3 }}
+                    className={`px-6 py-3 rounded-full text-sm font-semibold transition-all duration-300 ${
+                      videoFilter === cat.key
+                        ? "bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-lg shadow-pink-600/25"
+                        : isDarkMode
+                        ? "bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white hover:shadow-md"
+                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+                    }`}
+                  >
+                    {cat.label}
+                  </motion.button>
+                ))}
+              </div>
+
+              {/* Video Gallery Grid */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                className="relative"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
+                  {filteredVideos.map((video, idx) => (
+                    <motion.div
+                      key={video.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: idx * 0.05 }}
+                      whileHover={{ y: -4 }}
+                      className="group cursor-pointer"
+                      onClick={() => setSelectedVideo(video)}
+                    >
+                      {/* Card Container */}
+                      <div
+                        className={`overflow-hidden rounded-xl border shadow-sm hover:shadow-lg transition-all duration-300 ${
+                          isDarkMode
+                            ? "bg-slate-900 border-slate-800"
+                            : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        {/* Thumbnail Container */}
+                        <div className="relative aspect-video overflow-hidden bg-slate-100 dark:bg-slate-800">
+                          {video.thumbnail_url ? (
+                            <>
+                              <img
+                                src={video.thumbnail_url}
+                                alt={video.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center">
+                                <FiPlay size={24} className="text-white ml-1" />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Category Badge */}
+                          <div className="absolute top-1 left-3">
+                            <span className="text-xs font-medium px-2 py-1 bg-black/70 text-white rounded">
+                              {video.category.replace("-", " ").toUpperCase()}
+                            </span>
+                          </div>
+
+                          {/* Duration Badge */}
+                          {video.duration && (
+                            <div className="absolute bottom-3 right-3">
+                              <span className="text-xs font-medium px-2 py-1 bg-black/70 text-white rounded">
+                                {video.duration}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Play Overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <div className="w-14 h-14 bg-white/90 dark:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                              <FiPlay
+                                size={20}
+                                className="text-slate-900 dark:text-white ml-1"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Content Section */}
+                        <div className="p-4">
+                          <h4 className={`font-semibold mb-2 line-clamp-2 leading-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                            {video.title}
+                          </h4>
+
+                          {/* Metadata */}
+                          <div className="flex items-center justify-between text-sm">
+                            <div className={`flex items-center gap-4 ${isDarkMode ? "text-slate-400" : "text-slate-700"}`}>
+                              {video.views && (
+                                <div className="flex items-center gap-1.5">
+                                  <FiEye size={14} />
+                                  <span>{video.views}</span>
+                                </div>
+                              )}
+
+                              {video.year && (
+                                <div className="flex items-center gap-1.5">
+                                  <FiCalendar size={14} />
+                                  <span>{video.year}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Loading State */}
+                {/* {filteredVideos.length === 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
+                    {[...Array(8)].map((_, idx) => (
+                      <div key={idx} className="animate-pulse">
+                        <div className="aspect-video bg-slate-200 dark:bg-slate-800 rounded-xl mb-4" />
+                        <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded mb-2" />
+                        <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
+                      </div>
+                    ))}
+                  </div>
+                )} */}
+                {filteredVideos.length === 0 && (
+                  <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+                    <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200">
+                      Nothing here yet
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                      We couldn’t find any matching videos.
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+
+              {/* Video Count & CTA */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className={`text-center mt-12 text-sm font-display ${
+                  isDarkMode ? "text-white" : "text-slate-700"
+                }`}
+              >
+                {filteredVideos.length} Videos Available
+              </motion.div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
       {/* Video Portfolio */}
       <section
         className={`py-20 transition-colors duration-300 ${
@@ -2083,7 +2146,11 @@ export default function StudioLanding() {
             >
               Our Cinematic Work
             </h2>
-            <p className="max-w-2xl text-slate-700 dark:text-slate-400 text-lg leading-relaxed mx-auto transition-colors duration-300">
+            <p
+              className={`max-w-2xl text-lg leading-relaxed mx-auto transition-colors duration-300 ${
+                isDarkMode ? "text-slate-400" : "text-slate-700"
+              }`}
+            >
               Explore our professional video productions across different
               industries. Each video showcases our expertise in cinematic
               storytelling and professional videography.
@@ -2126,7 +2193,7 @@ export default function StudioLanding() {
                   className={`group relative overflow-hidden rounded-2xl backdrop-blur-md border transition-all duration-300 hover:scale-105 cursor-pointer ${
                     isDarkMode
                       ? "bg-slate-800/50 border-slate-700/50"
-                      : "bg-white/80 border-slate-200/50 shadow-lg"
+                      : "bg-slate-50/80 border-slate-200/50 shadow-lg"
                   }`}
                   onClick={() => setSelectedVideo(video)}
                 >
@@ -2609,7 +2676,7 @@ export default function StudioLanding() {
                       name="fullName"
                       value={formData.fullName}
                       onChange={handleInputChange}
-                      placeholder="John Doe"
+                      placeholder="your full name"
                       required
                       className={`w-full px-4 py-4 border rounded-xl focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 focus:outline-none transition-all duration-300 ${
                         isDarkMode
@@ -2631,7 +2698,7 @@ export default function StudioLanding() {
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      placeholder="john@example.com"
+                      placeholder="youremail@example.com"
                       required
                       className={`w-full px-4 py-4 border rounded-xl focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 focus:outline-none transition-all duration-300 ${
                         isDarkMode
@@ -2655,7 +2722,7 @@ export default function StudioLanding() {
                       name="phone"
                       value={formData.phone}
                       onChange={handleInputChange}
-                      placeholder="+251 911 449 901"
+                      placeholder="+251 911199762"
                       className={`w-full px-4 py-4 border rounded-xl focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 focus:outline-none transition-all duration-300 ${
                         isDarkMode
                           ? "bg-slate-800/30 border-slate-700/50 text-white placeholder-slate-500"
@@ -2902,7 +2969,11 @@ export default function StudioLanding() {
                     href={link.url}
                     title={link.platform}
                     target={link.url.startsWith("http") ? "_blank" : undefined}
-                    rel={link.url.startsWith("http") ? "noopener noreferrer" : undefined}
+                    rel={
+                      link.url.startsWith("http")
+                        ? "noopener noreferrer"
+                        : undefined
+                    }
                     className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
                       isDarkMode
                         ? "bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50"
@@ -2936,31 +3007,47 @@ export default function StudioLanding() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4"
+          className={`fixed inset-0 z-50 backdrop-blur-xl flex items-center justify-center p-4 ${
+            isDarkMode ? "bg-slate-950/95" : "bg-white/95"
+          }`}
           onClick={() => setSelectedImage(null)}
         >
           <button
             onClick={() => setSelectedImage(null)}
-            className="absolute top-6 right-6 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
+            className={`absolute top-6 right-6 w-12 h-12 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 z-10 ${
+              isDarkMode
+                ? "bg-slate-800/80 text-white hover:bg-slate-700"
+                : "bg-slate-200/80 text-slate-900 hover:bg-slate-300"
+            }`}
           >
             <FiX size={20} />
           </button>
           {/* Zoom Display */}
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
-            <div className="w-16 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
-              <span className="text-sm font-medium">
-                {Math.round(portfolioZoomLevel * 100)}%
-              </span>
+          {viewportWidth >= 768 && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
+              <div
+                className={`w-16 h-12 backdrop-blur-sm rounded-full flex items-center justify-center ${
+                  isDarkMode ? "bg-slate-800/80 text-white" : "bg-slate-200/80 text-slate-900"
+                }`}
+              >
+                <span className="text-sm font-medium">
+                  {Math.round(portfolioZoomLevel * 100)}%
+                </span>
+              </div>
             </div>
-          </div>
-          {filteredImages.length > 1 && (
+          )}
+          {filteredImages.length > 1 && viewportWidth >= 768 && (
             <>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   prevImage();
                 }}
-                className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
+                className={`absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 z-10 ${
+                  isDarkMode
+                    ? "text-white hover:bg-slate-700 bg-slate-800/80"
+                    : "text-slate-900 hover:bg-slate-300 bg-slate-200/80"
+                }`}
               >
                 <FiChevronLeft size={20} />
               </button>
@@ -2969,7 +3056,11 @@ export default function StudioLanding() {
                   e.stopPropagation();
                   nextImage();
                 }}
-                className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
+                className={`absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 z-10 ${
+                  isDarkMode
+                    ? "text-white hover:bg-slate-700 bg-slate-800/80"
+                    : "text-slate-900 hover:bg-slate-300 bg-slate-200/80"
+                }`}
               >
                 <FiChevronRight size={20} />
               </button>
@@ -2999,6 +3090,22 @@ export default function StudioLanding() {
             }}
             onMouseUp={() => setPortfolioIsDragging(false)}
             onMouseLeave={() => setPortfolioIsDragging(false)}
+            onTouchStart={(e) => {
+              e.currentTarget.dataset.touchStart = e.targetTouches[0].clientX;
+            }}
+            onTouchMove={(e) => {
+              e.currentTarget.dataset.touchEnd = e.targetTouches[0].clientX;
+            }}
+            onTouchEnd={(e) => {
+              const start = parseFloat(e.currentTarget.dataset.touchStart);
+              const end = parseFloat(e.currentTarget.dataset.touchEnd);
+              if (!start || !end) return;
+              const distance = start - end;
+              const isLeftSwipe = distance > 50;
+              const isRightSwipe = distance < -50;
+              if (isLeftSwipe && filteredImages.length > 1) nextImage();
+              if (isRightSwipe && filteredImages.length > 1) prevImage();
+            }}
             style={{
               cursor:
                 portfolioZoomLevel > 1
@@ -3019,8 +3126,12 @@ export default function StudioLanding() {
                   : "transform 0.3s ease",
               }}
             />
-            <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md rounded-full px-4 py-2">
-              <span className="text-white text-sm font-medium">
+            <div
+              className={`absolute -bottom-12 left-1/2 -translate-x-1/2 backdrop-blur-md rounded-full px-4 py-2 ${
+                isDarkMode ? "bg-slate-900/80 text-white" : "bg-white/80 text-slate-900"
+              }`}
+            >
+              <span className="text-sm font-medium">
                 {currentImageIndex + 1} / {filteredImages.length}
               </span>
             </div>
@@ -3127,14 +3238,20 @@ export default function StudioLanding() {
             <FiX size={20} />
           </button>
           {/* Zoom Display */}
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
-            <div className="w-16 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white">
-              <span className="text-sm font-medium">
-                {Math.round(zoomLevel * 100)}%
-              </span>
+          {viewportWidth >= 768 && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
+              <div
+                className={`w-16 h-12 backdrop-blur-sm rounded-full flex items-center justify-center ${
+                  isDarkMode ? "bg-slate-800/80 text-white" : "bg-slate-200/80 text-slate-900"
+                }`}
+              >
+                <span className="text-sm font-medium">
+                  {Math.round(zoomLevel * 100)}%
+                </span>
+              </div>
             </div>
-          </div>
-          {selectedService && selectedService.gallery_images.length > 1 && (
+          )}
+          {selectedService && selectedService.gallery_images.length > 1 && viewportWidth >= 768 && (
             <>
               <button
                 onClick={(e) => {
@@ -3142,7 +3259,11 @@ export default function StudioLanding() {
                   prevServiceImage();
                   setZoomLevel(1);
                 }}
-                className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
+                className={`absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 z-10 ${
+                  isDarkMode
+                    ? "text-white hover:bg-slate-700 bg-slate-800/80"
+                    : "text-slate-900 hover:bg-slate-300 bg-slate-200/80"
+                }`}
               >
                 <FiChevronLeft size={20} />
               </button>
@@ -3152,7 +3273,11 @@ export default function StudioLanding() {
                   nextServiceImage();
                   setZoomLevel(1);
                 }}
-                className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
+                className={`absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 z-10 ${
+                  isDarkMode
+                    ? "text-white hover:bg-slate-700 bg-slate-800/80"
+                    : "text-slate-900 hover:bg-slate-300 bg-slate-200/80"
+                }`}
               >
                 <FiChevronRight size={20} />
               </button>
@@ -3179,6 +3304,22 @@ export default function StudioLanding() {
             }}
             onMouseUp={() => setIsDragging(false)}
             onMouseLeave={() => setIsDragging(false)}
+            onTouchStart={(e) => {
+              e.currentTarget.dataset.touchStart = e.targetTouches[0].clientX;
+            }}
+            onTouchMove={(e) => {
+              e.currentTarget.dataset.touchEnd = e.targetTouches[0].clientX;
+            }}
+            onTouchEnd={(e) => {
+              const start = parseFloat(e.currentTarget.dataset.touchStart);
+              const end = parseFloat(e.currentTarget.dataset.touchEnd);
+              if (!start || !end) return;
+              const distance = start - end;
+              const isLeftSwipe = distance > 50;
+              const isRightSwipe = distance < -50;
+              if (isLeftSwipe && selectedService && selectedService.gallery_images.length > 1) nextServiceImage();
+              if (isRightSwipe && selectedService && selectedService.gallery_images.length > 1) prevServiceImage();
+            }}
             style={{
               cursor:
                 zoomLevel > 1 ? (isDragging ? "grabbing" : "grab") : "default",
@@ -3209,29 +3350,53 @@ export default function StudioLanding() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4"
+          className={`fixed inset-0 z-50 backdrop-blur-xl flex items-center justify-center p-4 ${
+            isDarkMode ? "bg-slate-950/95" : "bg-white/95"
+          }`}
           onClick={() => setSelectedVideo(null)}
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="relative w-full max-w-4xl mx-auto bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-700/50 overflow-hidden"
+            className={`relative w-full max-w-4xl mx-auto backdrop-blur-md rounded-2xl border overflow-hidden ${
+              isDarkMode
+                ? "bg-slate-900/50 border-slate-700/50"
+                : "bg-white/90 border-slate-200/50"
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-700/50 p-6">
+            <div
+              className={`sticky top-0 z-10 backdrop-blur-md border-b p-6 ${
+                isDarkMode
+                  ? "bg-slate-900/80 border-slate-700/50"
+                  : "bg-white/95 border-slate-200/50"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-semibold text-white font-display">
+                  <h3
+                    className={`text-xl font-semibold font-display ${
+                      isDarkMode ? "text-white" : "text-slate-900"
+                    }`}
+                  >
                     {selectedVideo.title}
                   </h3>
-                  <p className="text-slate-400 text-sm mt-1">
+                  <p
+                    className={`text-sm mt-1 ${
+                      isDarkMode ? "text-slate-400" : "text-slate-600"
+                    }`}
+                  >
                     {selectedVideo.description}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedVideo(null)}
-                  className="w-10 h-10 bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                    isDarkMode
+                      ? "bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700"
+                      : "bg-slate-200/80 text-slate-700 hover:text-slate-900 hover:bg-slate-300"
+                  }`}
                 >
                   <FiX size={20} />
                 </button>
@@ -3263,9 +3428,17 @@ export default function StudioLanding() {
                     type="button"
                     onClick={handleSelectedVideoPlay}
                     aria-label="Play video"
-                    className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-white font-semibold tracking-wide"
+                    className={`absolute inset-0 flex flex-col items-center justify-center gap-3 font-semibold tracking-wide ${
+                      isDarkMode
+                        ? "bg-black/60 text-white"
+                        : "bg-white/60 text-slate-900"
+                    }`}
                   >
-                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                    <div
+                      className={`w-16 h-16 rounded-full backdrop-blur-sm flex items-center justify-center ${
+                        isDarkMode ? "bg-white/20" : "bg-slate-800/20"
+                      }`}
+                    >
                       <FiPlay size={28} className="ml-1" />
                     </div>
                     <span>Play Video</span>
@@ -3273,7 +3446,11 @@ export default function StudioLanding() {
                 )}
               </div>
               <div className="mt-4 text-center">
-                <p className="text-slate-400 text-sm">
+                <p
+                  className={`text-sm ${
+                    isDarkMode ? "text-slate-400" : "text-slate-600"
+                  }`}
+                >
                   Explore our professional video productions across different
                   industries.
                 </p>
