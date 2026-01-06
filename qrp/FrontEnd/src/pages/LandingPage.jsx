@@ -1,18 +1,14 @@
-import { Link } from 'react-router-dom'
+
 import { useEffect, useState } from 'react'
-import { QRCodeCanvas } from 'qrcode.react'
 import { motion } from 'framer-motion'
-import { Sparkles, Camera, Share2, Shield, Zap, Palette, Smartphone, QrCode, Menu, X, Sun, Moon } from 'lucide-react'
+import { Sparkles, Camera, Share2, Shield, Zap, Palette, Smartphone, QrCode } from 'lucide-react'
 import { listAlbums } from '../services/api.js'
 import { getImageUrl } from '../utils/imageUtils.js'
 import ParticleSystem from '../components/ParticleSystem.jsx'
-import { useAuth } from '../contexts/AuthContext.jsx'
 
 export default function LandingPage() {
-  const { isAuthenticated, logout } = useAuth()
   const [albums, setAlbums] = useState([])
   const [loading, setLoading] = useState(true)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("theme");
@@ -22,17 +18,6 @@ export default function LandingPage() {
     return false;
   });
 
-  const toggleTheme = () => {
-    const newDarkMode = !isDarkMode;
-    setIsDarkMode(newDarkMode);
-    if (newDarkMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  };
 
   useEffect(() => {
     if (isDarkMode) {
@@ -58,7 +43,6 @@ export default function LandingPage() {
     }
     return (a.photos || []).slice(0, 1).map(photo => typeof photo === 'string' ? photo : (photo.thumbnail_url || photo.url))
   }).filter(Boolean).slice(0, 4) : []
-  const heroAlbumUrl = albums?.[0]?.url || window.location.origin + '/create'
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -80,53 +64,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen">
       {/* Navigation */}
-      <nav className="fixed top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 z-50 backdrop-blur-md rounded-xl sm:rounded-2xl shadow-xl bg-white/10 border border-white/20">
-        <div className="px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-              QR Albums
-            </Link>
-            
-            <div className="hidden md:flex items-center gap-6">
-              <a href="#how" className="text-sm font-medium hover:text-pink-600 transition-colors">How It Works</a>
-              {isAuthenticated ? (
-                <>
-                  <Link to="/dashboard" className="text-sm font-medium hover:text-pink-600 transition-colors">Dashboard</Link>
-                  <button onClick={logout} className="text-sm font-medium hover:text-pink-600 transition-colors">Logout</button>
-                </>
-              ) : (
-                <Link to="/login" className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors">Sign In</Link>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button onClick={toggleTheme} className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 hover:bg-white/20 transition-colors">
-                {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-              </button>
-              <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden w-10 h-10 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 hover:bg-white/20 transition-colors">
-                {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-white/20 bg-white/5 backdrop-blur-md rounded-b-xl sm:rounded-b-2xl">
-            <div className="px-4 sm:px-6 py-3 sm:py-4 space-y-2">
-              <a href="#how" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium hover:text-pink-600 transition-colors">How It Works</a>
-              {isAuthenticated ? (
-                <>
-                  <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors">Dashboard</Link>
-                  <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors text-left w-full">Logout</button>
-                </>
-              ) : (
-                <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-sm font-medium text-pink-600 hover:text-pink-700 transition-colors">Sign In</Link>
-              )}
-            </div>
-          </div>
-        )}
-      </nav>
+      
 
     <motion.section 
       className="py-5 md:py-1 lg:py-8 pt-20"
@@ -149,35 +87,13 @@ export default function LandingPage() {
             </div>
 
             <h1 className="font-display text-3xl md:text-4xl lg:text-5xl leading-[1.1] font-bold text-balance" style={{ color: 'var(--text)' }}>
-              A modern QR wedding album
+              A modern QR album
               <span className="block text-gradient">crafted to be remembered</span>
             </h1>
 
             <p className="text-base md:text-md leading-relaxed font-sans" style={{ color: 'var(--text-soft)' }}>
               Create a stunning online album in minutes. Guests join by scanning a QR code—no apps to download, just beautiful memories on any device.
             </p>
-
-            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-              {isAuthenticated ? (
-                <>
-                  <Link to="/dashboard" className="btn btn-primary text-sm md:text-base px-6 md:px-8 py-3 md:py-4">
-                    Dashboard
-                  </Link>
-                  <button
-                    onClick={() => {
-                      logout();
-                    }}
-                    className="btn btn-ghost text-sm md:text-base px-6 md:px-8 py-3 md:py-4"
-                  >
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <Link to="/login" className="btn btn-primary text-sm md:text-base px-6 md:px-8 py-3 md:py-4">
-                  Sign In
-                </Link>
-              )}
-            </div>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2 md:pt-4">
               {["No app required", "Unlimited guests", "Private by default"].map((t) => (
@@ -287,51 +203,9 @@ export default function LandingPage() {
               )}
             </div>
 
-            <motion.div 
-              className="absolute -bottom-3 -right-3 md:-bottom-5 md:-right-5 glass rounded-lg md:rounded-xl p-2.5 md:p-3.5 shadow-xl md:shadow-2xl flex items-center gap-2.5 md:gap-3 z-30"
-              initial={{ opacity: 0, scale: 0.8, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ delay: 1, duration: 0.5, type: 'spring', stiffness: 200 }}
-              style={{ border: '1px solid var(--border)' }}
-            >
-              <div className="p-1.5 md:p-2.5 rounded-md md:rounded-lg" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                <QRCodeCanvas value={heroAlbumUrl} size={40} includeMargin={false} className="md:w-12 md:h-12" />
-              </div>
-              <div className="font-sans text-xs md:text-sm" style={{ color: 'var(--text)' }}>
-                <div className="font-semibold">Instant Access</div>
-                <div className="hidden sm:block text-xs" style={{ color: 'var(--text-soft)' }}>Scan & view</div>
-              </div>
-            </motion.div>
           </motion.div>
         </div>
       </div>
-
-      {/* QUICK STATS / VALUE PROPS */}
-      <motion.div 
-        className="grid md:grid-cols-3 gap-4 md:gap-6 mb-16"
-        variants={containerVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true }}
-      >
-        {[
-          { icon: QrCode, title: 'Frictionless Access', desc: 'Elegant QR codes that just work—no app installs' },
-          { icon: Palette, title: 'Beautiful Themes', desc: 'Tailored looks for weddings, travel, family and more' },
-          { icon: Shield, title: 'Privacy First', desc: 'You control who sees and what gets shared' },
-        ].map(({ icon: Icon, title, desc }) => (
-          <motion.div key={title} className="card-enhanced" variants={itemVariants}>
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl grid place-items-center" style={{ background: 'var(--blush)' }}>
-                <Icon className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-              </div>
-              <div>
-                <h3 className="font-serif text-lg md:text-xl font-semibold" style={{ color: 'var(--text)' }}>{title}</h3>
-                <p className="font-sans text-sm md:text-base mt-1" style={{ color: 'var(--text-soft)' }}>{desc}</p>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </motion.div>
 
       {/* HOW IT WORKS */}
       <motion.div 
@@ -476,36 +350,6 @@ export default function LandingPage() {
         </div>
       </motion.div>
 
-      {/* Final CTA */}
-      <motion.div 
-        className="mt-20 md:mt-28"
-        variants={itemVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true }}
-      >
-        <div className="rounded-2xl md:rounded-3xl p-8 md:p-12 border text-center" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
-          <h3 className="font-serif text-2xl md:text-3xl font-semibold" style={{ color: 'var(--text)' }}>
-            Ready to share your story?
-          </h3>
-          <p className="font-sans text-sm md:text-base mt-2 mb-6" style={{ color: 'var(--text-soft)' }}>
-            Create a beautiful album in minutes and share it instantly via QR code.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4">
-            {isAuthenticated ? (
-              <>
-                <Link to="/create" className="btn btn-primary px-8 py-4">Create Album</Link>
-                <Link to="/dashboard" className="btn btn-ghost px-8 py-4">Dashboard</Link>
-              </>
-            ) : (
-              <>
-                <Link to="/login" className="btn btn-primary px-8 py-4">Get Started</Link>
-                <a href="#how" className="btn btn-ghost px-8 py-4">See How It Works</a>
-              </>
-            )}
-          </div>
-        </div>
-      </motion.div>
     </motion.section>
     </div>
   )

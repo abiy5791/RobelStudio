@@ -2487,14 +2487,14 @@ export default function StudioLanding() {
                 that will last a lifetime.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a {...primaryCtaProps}>
+                <a href="#contact">
                   <button className="bg-white text-pink-600 px-8 py-4 rounded-full font-semibold hover:bg-white/90 transition-all duration-300 flex items-center gap-2 justify-center w-full sm:w-auto">
                     Book Session <FiArrowRight size={18} />
                   </button>
                 </a>
                 <Link to="/albums-app">
                   <button className="border-2 border-white/30 text-white px-8 py-4 rounded-full font-semibold hover:bg-white/10 transition-all duration-300 w-full sm:w-auto">
-                    QR Albums App
+                   About QR Album
                   </button>
                 </Link>
               </div>
