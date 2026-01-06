@@ -42,3 +42,45 @@ export const fetchStudioData = async ({ timeout = DEFAULT_TIMEOUT_MS, retries = 
   console.error("Failed to fetch studio data:", lastError);
   throw lastError ?? new Error("Unable to load studio data");
 };
+
+export const submitContactMessage = async (
+  payload,
+  { timeout = DEFAULT_TIMEOUT_MS } = {}
+) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/contact/`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Contact API responded with ${response.status}`;
+      try {
+        const errorData = await response.json();
+        if (errorData?.detail) {
+          errorMessage = errorData.detail;
+        }
+      } catch {
+        // Ignore JSON parse failures and fall back to generic error
+      }
+      throw new Error(errorMessage);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Contact request timed out. Please try again.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};

@@ -38,7 +38,7 @@ import {
 } from "react-icons/fi";
 import { FaTiktok, FaWhatsapp, FaYoutube } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
-import { fetchStudioData } from "../services/studioApi";
+import { fetchStudioData, submitContactMessage } from "../services/studioApi";
 
 import { formatNumber } from "../utils/numberUtils";
 import { validateAlbumId } from "../utils/albumUtils";
@@ -783,37 +783,26 @@ export default function StudioLanding() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/contact/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          full_name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          service_type: formData.serviceType,
-          project_details: formData.projectDetails,
-        }),
+      await submitContactMessage({
+        full_name: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        service_type: formData.serviceType,
+        project_details: formData.projectDetails,
       });
 
-      if (response.ok) {
-        // Reset form
-        setFormData({
-          fullName: "",
-          email: "",
-          phone: "",
-          serviceType: "",
-          projectDetails: "",
-        });
-        setFormStatus({
-          type: "success",
-          message: "Message sent! We'll get back to you within 24 hours.",
-        });
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to send message');
-      }
+      // Reset form after a successful submission
+      setFormData({
+        fullName: "",
+        email: "",
+        phone: "",
+        serviceType: "",
+        projectDetails: "",
+      });
+      setFormStatus({
+        type: "success",
+        message: "Message sent! We'll get back to you within 24 hours.",
+      });
     } catch (error) {
       setFormStatus({
         type: "error",
