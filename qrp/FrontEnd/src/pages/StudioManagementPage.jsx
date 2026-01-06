@@ -1798,7 +1798,7 @@ export default function StudioManagementPage() {
                     className="block text-sm font-medium font-sans"
                     style={{ color: "var(--text)" }}
                   >
-                    Emergency Contact
+                    Alternate Phone
                   </label>
                   <input
                     type="tel"

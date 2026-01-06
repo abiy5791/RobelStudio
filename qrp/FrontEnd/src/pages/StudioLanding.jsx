@@ -446,7 +446,7 @@ export default function StudioLanding() {
     if (contactInfo.emergency_phone) {
       methods.push({
         key: "emergency",
-        title: "Emergency Line",
+        title: "Alternate Mobile Number",
         icon: FiAlertTriangle,
         value: contactInfo.emergency_phone,
         href: `tel:${sanitizePhoneValue(contactInfo.emergency_phone)}`,
@@ -2544,67 +2544,62 @@ export default function StudioLanding() {
           </motion.div>
 
           {contactMethods.length > 0 ? (
-            <div className="grid md:grid-cols-3 gap-6 mb-12">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
               {contactMethods.map((method, idx) => {
                 const IconComponent = method.icon || FiLink;
-                const interactiveProps = method.href
-                  ? {
-                      href: method.href,
-                      target: method.external ? "_blank" : undefined,
-                      rel: method.external ? "noopener noreferrer" : undefined,
-                    }
-                  : {};
-
                 const Wrapper = method.href ? "a" : "div";
 
                 return (
                   <motion.div
                     key={method.key || method.title}
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ delay: idx * 0.08 }}
-                    className={`p-6 text-center hover:scale-105 transition-all duration-300 rounded-2xl backdrop-blur-md border ${
-                      isDarkMode
-                        ? "bg-slate-800/50 border-slate-700/50"
-                        : "bg-white/80 border-slate-200/50 shadow-sm"
-                    }`}
+                    transition={{ delay: idx * 0.05 }}
                   >
-                    <div className="w-16 h-16 bg-pink-600/20 rounded-2xl flex items-center justify-center text-pink-400 mx-auto mb-4">
-                      <IconComponent size={24} />
-                    </div>
-                    <h3
-                      className={`text-lg font-semibold mb-2 transition-colors duration-300 ${
-                        isDarkMode ? "text-white" : "text-slate-900"
+                    <Wrapper
+                      {...(method.href && {
+                        href: method.href,
+                        target: method.external ? "_blank" : undefined,
+                        rel: method.external ? "noopener noreferrer" : undefined,
+                      })}
+                      className={`block p-5 rounded-xl border transition-all duration-200 ${
+                        method.href ? "hover:border-pink-500 cursor-pointer" : ""
+                      } ${
+                        isDarkMode
+                          ? "bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50"
+                          : "bg-white border-slate-200 hover:shadow-md"
                       }`}
                     >
-                      {method.title}
-                    </h3>
-                    <Wrapper
-                      {...interactiveProps}
-                      className={`${
-                        method.href
-                          ? "transition-colors hover:text-pink-400"
-                          : ""
-                      } ${
-                        isDarkMode ? "text-slate-300" : "text-slate-700"
-                      } whitespace-pre-line`}
-                    >
-                      {method.value}
+                      <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          isDarkMode ? "bg-pink-500/10 text-pink-400" : "bg-pink-50 text-pink-600"
+                        }`}>
+                          <IconComponent size={20} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className={`text-sm font-medium mb-1 ${
+                            isDarkMode ? "text-slate-200" : "text-slate-900"
+                          }`}>
+                            {method.title}
+                          </h3>
+                          <p className={`text-sm whitespace-pre-line break-words ${
+                            isDarkMode ? "text-slate-400" : "text-slate-600"
+                          } ${method.href ? "hover:text-pink-500" : ""}`}>
+                            {method.value}
+                          </p>
+                        </div>
+                      </div>
                     </Wrapper>
                   </motion.div>
                 );
               })}
             </div>
           ) : (
-            <div
-              className={`mb-12 p-6 rounded-2xl border text-center text-sm ${
-                isDarkMode
-                  ? "border-slate-700/50 text-slate-400"
-                  : "border-slate-200 text-slate-600"
-              }`}
-            >
-              Contact information will appear here once it is configured.
+            <div className={`mb-12 p-4 rounded-xl border text-center text-sm ${
+              isDarkMode ? "border-slate-700/50 text-slate-400" : "border-slate-200 text-slate-600"
+            }`}>
+              Contact information will appear here once configured.
             </div>
           )}
 
