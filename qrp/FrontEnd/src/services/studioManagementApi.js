@@ -623,3 +623,59 @@ export async function bulkUploadVideos(categoryId, videoFiles, thumbnailFilesOrP
     xhr.send(formData)
   })
 }
+
+// Contact Messages Management
+export async function getContactMessages(params = {}) {
+  const query = new URLSearchParams()
+  if (params.page) {
+    query.set('page', params.page)
+  }
+  if (params.page_size) {
+    query.set('page_size', params.page_size)
+  }
+  if (params.status) {
+    query.set('status', params.status)
+  }
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const res = await fetch(`${API_BASE}/api/manage/messages/${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse(res, 'Failed to fetch contact messages')
+}
+
+export async function getContactMessage(id) {
+  const res = await fetch(`${API_BASE}/api/manage/messages/${id}/`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse(res, 'Failed to fetch contact message')
+}
+
+export async function updateContactMessageStatus(id, status) {
+  const res = await fetch(`${API_BASE}/api/manage/messages/${id}/`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status }),
+  })
+  return handleResponse(res, 'Failed to update contact message status')
+}
+
+export async function deleteContactMessage(id) {
+  const res = await fetch(`${API_BASE}/api/manage/messages/${id}/`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  await handleResponse(res, 'Failed to delete contact message')
+}
+
+export async function deleteContactMessages(filter = {}) {
+  const query = new URLSearchParams()
+  if (filter.status && filter.status !== 'all') {
+    query.set('status', filter.status)
+  }
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const res = await fetch(`${API_BASE}/api/manage/messages/${queryString}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse(res, 'Failed to delete contact messages')
+}

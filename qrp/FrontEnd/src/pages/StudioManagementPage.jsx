@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Settings,
@@ -82,6 +82,10 @@ import {
   updateVideo,
   deleteVideo,
   bulkUploadVideos,
+  getContactMessages,
+  deleteContactMessage,
+  deleteContactMessages,
+  updateContactMessageStatus,
 } from "../services/studioManagementApi";
 
 const MODAL_DEFAULT_STATE = {
@@ -166,7 +170,9 @@ const stringifyFieldErrors = (data) => {
         : typeof value === "string"
         ? value
         : JSON.stringify(value);
-      return normalizedField ? `${normalizedField}: ${normalizedValue}` : normalizedValue;
+      return normalizedField
+        ? `${normalizedField}: ${normalizedValue}`
+        : normalizedValue;
     })
     .filter(Boolean)
     .join(" | ");
@@ -242,31 +248,48 @@ function ActionModal({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4"
+        className="w-full max-w-lg rounded-2xl border shadow-2xl p-6 space-y-4"
+        style={{
+          background: "var(--surface)",
+          borderColor: "var(--border)",
+          color: "var(--text)",
+        }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
         <div className="flex items-start gap-4">
-          <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${gradientClass} text-white flex items-center justify-center shadow-lg`}>
+          <div
+            className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${gradientClass} text-white flex items-center justify-center shadow-lg`}
+          >
             {icon}
           </div>
           <div className="flex-1">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
+                <h3
+                  className="text-xl font-semibold"
+                  style={{ color: "var(--text)" }}
+                >
                   {title}
                 </h3>
                 {description && (
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                  <p
+                    className="mt-1 text-sm leading-relaxed"
+                    style={{ color: "var(--text-soft)" }}
+                  >
                     {description}
                   </p>
                 )}
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                className="p-2 rounded-full transition-colors hover:opacity-80"
+                style={{
+                  background: "var(--border-soft)",
+                  color: "var(--text-soft)",
+                }}
                 aria-label="Close dialog"
               >
                 <X className="w-4 h-4" />
@@ -276,17 +299,26 @@ function ActionModal({
         </div>
 
         {details.length > 0 && (
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40">
-            <dl className="divide-y divide-slate-200 dark:divide-slate-800">
+          <div
+            className="rounded-2xl border"
+            style={{
+              background: "var(--surface-soft)",
+              borderColor: "var(--border)",
+            }}
+          >
+            <dl className="divide-y" style={{ borderColor: "var(--border)" }}>
               {details.map((detail, index) => (
                 <div
                   key={`${detail.label}-${index}`}
                   className="flex items-center justify-between px-4 py-3 text-sm"
                 >
-                  <dt className="text-slate-500 dark:text-slate-400">
+                  <dt style={{ color: "var(--text-soft)" }}>
                     {detail.label}
                   </dt>
-                  <dd className="text-slate-900 dark:text-white font-medium text-right">
+                  <dd
+                    className="font-medium text-right"
+                    style={{ color: "var(--text)" }}
+                  >
                     {detail.value}
                   </dd>
                 </div>
@@ -306,7 +338,12 @@ function ActionModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors font-medium"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border transition-colors font-medium"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text)",
+              background: "var(--surface-soft)",
+            }}
             disabled={busy}
           >
             {cancelLabel}
@@ -315,7 +352,9 @@ function ActionModal({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-white font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${confirmClasses} ${busy ? "opacity-70 cursor-not-allowed" : ""}`}
+            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-white font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${confirmClasses} ${
+              busy ? "opacity-70 cursor-not-allowed" : ""
+            }`}
           >
             {busy ? "Please wait..." : confirmLabel}
           </button>
@@ -429,6 +468,18 @@ export default function StudioManagementPage() {
     is_active: true,
   });
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+
+  // Contact messages state
+  const [messages, setMessages] = useState([]);
+  const [messageCounts, setMessageCounts] = useState({ total: 0, new: 0 });
+  const [messagePage, setMessagePage] = useState(1);
+  const [messagePageSize, setMessagePageSize] = useState(10);
+  const [messagePagination, setMessagePagination] = useState({
+    count: 0,
+    next: null,
+    previous: null,
+  });
+  const [messageStatusFilter, setMessageStatusFilter] = useState("all");
   const lightboxUrl =
     selectedImage && typeof selectedImage === "object"
       ? selectedImage.url
@@ -439,8 +490,7 @@ export default function StudioManagementPage() {
       : undefined;
   const isVideoLightbox = Boolean(
     lightboxUrl &&
-      (lightboxType === "video" ||
-        /\.(mp4|webm|mov)$/i.test(lightboxUrl))
+      (lightboxType === "video" || /\.(mp4|webm|mov)$/i.test(lightboxUrl))
   );
 
   const scrollToSection = (sectionId) => {
@@ -622,6 +672,7 @@ export default function StudioManagementPage() {
     { id: "gallery", label: "Service Gallery", icon: Image },
     { id: "videos", label: "Video Portfolio", icon: Film },
     { id: "contact", label: "Contact", icon: Phone },
+    { id: "messages", label: "Messages", icon: FiMail },
   ];
 
   const iconOptions = [
@@ -633,57 +684,226 @@ export default function StudioManagementPage() {
     "FiSun",
   ];
 
-  const refreshPortfolioImages = useCallback(async (categoryId, notifyOnError = false) => {
-    if (!categoryId) {
-      setPortfolioImages([]);
-      return;
-    }
-    try {
-      const imagesData = await getPortfolioImages(categoryId);
-      setPortfolioImages(Array.isArray(imagesData) ? imagesData : []);
-    } catch (error) {
-      setPortfolioImages([]);
-      if (notifyOnError) {
-        notifyError(error, "Failed to load portfolio images");
-      }
-    }
-  }, []);
+  const messagePageSizeOptions = [5, 10, 25, 50];
+  const messageStatusOptions = [
+    { label: "All", value: "all" },
+    { label: "New", value: "new" },
+    { label: "Read", value: "read" },
+    { label: "Replied", value: "replied" },
+    { label: "Archived", value: "archived" },
+  ];
+  const activeMessageFilterLabel =
+    messageStatusOptions.find((option) => option.value === messageStatusFilter)
+      ?.label || "All";
 
-  const refreshServiceGallery = useCallback(async (serviceId, notifyOnError = false) => {
-    if (!serviceId) {
-      setServiceGalleryImages([]);
-      return;
+  const totalMessagePages = useMemo(() => {
+    if (!messagePagination.count) {
+      return 1;
     }
-    try {
-      const galleryData = await getServiceGalleryImages(serviceId);
-      setServiceGalleryImages(Array.isArray(galleryData) ? galleryData : []);
-    } catch (error) {
-      setServiceGalleryImages([]);
-      if (notifyOnError) {
-        notifyError(error, "Failed to load service gallery");
-      }
-    }
-  }, []);
+    return Math.max(1, Math.ceil(messagePagination.count / messagePageSize));
+  }, [messagePagination.count, messagePageSize]);
 
-  const refreshVideos = useCallback(async (categoryId, notifyOnError = false) => {
-    if (!categoryId) {
-      setVideos([]);
-      return;
+  const serviceLabelMap = useMemo(() => {
+    const map = new Map();
+    if (!Array.isArray(services)) {
+      return map;
     }
-    try {
-      const videosData = await getVideos(categoryId);
-      setVideos(Array.isArray(videosData) ? videosData : []);
-    } catch (error) {
-      setVideos([]);
-      if (notifyOnError) {
-        notifyError(error, "Failed to load videos");
+    services.forEach((service) => {
+      if (!service) {
+        return;
       }
-    }
-  }, []);
+      const title =
+        (typeof service.title === "string" && service.title.trim()) ||
+        `Service ${service.id ?? ""}`.trim();
+      if (service.id !== undefined && service.id !== null) {
+        map.set(String(service.id), title);
+      }
+      if (typeof service.title === "string") {
+        map.set(service.title.trim().toLowerCase(), service.title);
+      }
+    });
+    return map;
+  }, [services]);
+
+  const resolveServiceTypeLabel = useCallback(
+    (value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      const normalized = String(value).trim();
+      if (!normalized) {
+        return null;
+      }
+      if (serviceLabelMap.has(normalized)) {
+        return serviceLabelMap.get(normalized);
+      }
+      const lower = normalized.toLowerCase();
+      if (serviceLabelMap.has(lower)) {
+        return serviceLabelMap.get(lower);
+      }
+      return normalized;
+    },
+    [serviceLabelMap]
+  );
+
+  const refreshPortfolioImages = useCallback(
+    async (categoryId, notifyOnError = false) => {
+      if (!categoryId) {
+        setPortfolioImages([]);
+        return;
+      }
+      try {
+        const imagesData = await getPortfolioImages(categoryId);
+        setPortfolioImages(Array.isArray(imagesData) ? imagesData : []);
+      } catch (error) {
+        setPortfolioImages([]);
+        if (notifyOnError) {
+          notifyError(error, "Failed to load portfolio images");
+        }
+      }
+    },
+    []
+  );
+
+  const refreshServiceGallery = useCallback(
+    async (serviceId, notifyOnError = false) => {
+      if (!serviceId) {
+        setServiceGalleryImages([]);
+        return;
+      }
+      try {
+        const galleryData = await getServiceGalleryImages(serviceId);
+        setServiceGalleryImages(Array.isArray(galleryData) ? galleryData : []);
+      } catch (error) {
+        setServiceGalleryImages([]);
+        if (notifyOnError) {
+          notifyError(error, "Failed to load service gallery");
+        }
+      }
+    },
+    []
+  );
+
+  const refreshVideos = useCallback(
+    async (categoryId, notifyOnError = false) => {
+      if (!categoryId) {
+        setVideos([]);
+        return;
+      }
+      try {
+        const videosData = await getVideos(categoryId);
+        setVideos(Array.isArray(videosData) ? videosData : []);
+      } catch (error) {
+        setVideos([]);
+        if (notifyOnError) {
+          notifyError(error, "Failed to load videos");
+        }
+      }
+    },
+    []
+  );
+
+  const refreshMessages = useCallback(
+    async ({
+      includeList = false,
+      silent = true,
+      page,
+      pageSize,
+      status,
+    } = {}) => {
+      const currentPage =
+        typeof page === "number" && page > 0 ? page : messagePage;
+      const currentPageSize =
+        typeof pageSize === "number" && pageSize > 0
+          ? pageSize
+          : messagePageSize;
+      const resolvedStatus =
+        typeof status === "string" && status.trim()
+          ? status.trim()
+          : messageStatusFilter;
+      const normalizedStatus =
+        resolvedStatus && resolvedStatus !== "all" ? resolvedStatus : undefined;
+
+      const normalizeResponse = (data) => {
+        if (!data) {
+          return { results: [], count: 0, next: null, previous: null };
+        }
+        if (Array.isArray(data)) {
+          return {
+            results: data,
+            count: data.length,
+            next: null,
+            previous: null,
+          };
+        }
+        return {
+          results: Array.isArray(data.results) ? data.results : [],
+          count:
+            typeof data.count === "number"
+              ? data.count
+              : Array.isArray(data.results)
+              ? data.results.length
+              : 0,
+          next: data.next ?? null,
+          previous: data.previous ?? null,
+        };
+      };
+
+      try {
+        const [messagesData, newMessagesData] = await Promise.all([
+          getContactMessages({
+            page: currentPage,
+            page_size: currentPageSize,
+            status: normalizedStatus,
+          }),
+          getContactMessages({ page: 1, page_size: 1, status: "new" }),
+        ]);
+
+        const { results, count, next, previous } =
+          normalizeResponse(messagesData);
+        if (includeList) {
+          setMessages(results);
+        }
+        setMessagePagination({ count, next, previous });
+        setMessagePage(currentPage);
+        setMessagePageSize(currentPageSize);
+
+        const newCountMeta = normalizeResponse(newMessagesData);
+        setMessageCounts({ total: count, new: newCountMeta.count });
+        return results;
+      } catch (error) {
+        setMessageCounts({ total: 0, new: 0 });
+        setMessagePagination({ count: 0, next: null, previous: null });
+        if (includeList) {
+          setMessages([]);
+        }
+        if (silent) {
+          console.warn("Failed to refresh messages", error);
+          return null;
+        }
+        throw error;
+      }
+    },
+    [messagePage, messagePageSize, messageStatusFilter]
+  );
 
   useEffect(() => {
     loadData();
   }, [activeTab]);
+
+  useEffect(() => {
+    refreshMessages({ includeList: false, silent: true });
+  }, [refreshMessages]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      refreshMessages({
+        includeList: activeTab === "messages",
+        silent: activeTab !== "messages",
+      });
+    }, 60000);
+    return () => clearInterval(intervalId);
+  }, [activeTab, refreshMessages]);
 
   useEffect(() => {
     if (!modalConfig.isOpen) return;
@@ -749,7 +969,7 @@ export default function StudioManagementPage() {
 
   const loadData = async () => {
     setLoading(true);
-     setGlobalError(null);
+    setGlobalError(null);
     try {
       switch (activeTab) {
         case "contact":
@@ -762,9 +982,7 @@ export default function StudioManagementPage() {
               ? { ...CONTACT_DEFAULTS, ...contactData }
               : { ...CONTACT_DEFAULTS }
           );
-          setSocialLinks(
-            Array.isArray(socialLinksData) ? socialLinksData : []
-          );
+          setSocialLinks(Array.isArray(socialLinksData) ? socialLinksData : []);
           setEditingSocialLink(null);
           setSocialLinkForm({ ...SOCIAL_LINK_DEFAULT });
           break;
@@ -826,6 +1044,20 @@ export default function StudioManagementPage() {
             setVideos([]);
           }
           break;
+        case "messages":
+          const servicesDataForMessages = await getServices();
+          setServices(
+            Array.isArray(servicesDataForMessages)
+              ? servicesDataForMessages
+              : []
+          );
+          await refreshMessages({
+            includeList: true,
+            silent: false,
+            page: 1,
+            pageSize: messagePageSize,
+          });
+          break;
       }
     } catch (error) {
       notifyError(error, "Failed to load studio data");
@@ -834,6 +1066,11 @@ export default function StudioManagementPage() {
       if (activeTab === "testimonials") setTestimonials([]);
       if (activeTab === "portfolio") setCategories([]);
       if (activeTab === "videos") setVideoCategories([]);
+      if (activeTab === "messages") {
+        setMessages([]);
+        setMessageCounts({ total: 0, new: 0 });
+        setMessagePagination({ count: 0, next: null, previous: null });
+      }
     } finally {
       setLoading(false);
     }
@@ -922,9 +1159,7 @@ export default function StudioManagementPage() {
       setVideoForm({
         title: "",
         description: "",
-        category: selectedVideoCategory
-          ? String(selectedVideoCategory)
-          : "",
+        category: selectedVideoCategory ? String(selectedVideoCategory) : "",
         video_file: null,
         thumbnail: null,
         duration: "",
@@ -1285,9 +1520,112 @@ export default function StudioManagementPage() {
       );
       toast.success("Order updated successfully");
     } catch (error) {
-                              notifyError("Failed to update order");
+      notifyError("Failed to update order");
       loadData(); // Reload on error
     }
+  };
+
+  const handleMessageStatusUpdate = async (messageId, newStatus) => {
+    try {
+      await updateContactMessageStatus(messageId, newStatus);
+      toast.success("Message status updated successfully");
+      await refreshMessages({ includeList: true, silent: false });
+    } catch (error) {
+      notifyError(error, "Failed to update message status");
+    }
+  };
+
+  const handleMessagePageChange = (direction) => {
+    const delta = direction === "next" ? 1 : -1;
+    const targetPage = messagePage + delta;
+    if (targetPage < 1 || targetPage > totalMessagePages) {
+      return;
+    }
+    refreshMessages({ includeList: true, silent: false, page: targetPage });
+  };
+
+  const handleMessagePageSizeChange = (size) => {
+    const parsedSize = Number(size) || 10;
+    refreshMessages({
+      includeList: true,
+      silent: false,
+      page: 1,
+      pageSize: parsedSize,
+    });
+  };
+
+  const handleMessageFilterChange = (value) => {
+    const normalizedFilter = (value || "all").toString().trim() || "all";
+    setMessageStatusFilter(normalizedFilter);
+    refreshMessages({
+      includeList: true,
+      silent: false,
+      page: 1,
+      status: normalizedFilter,
+    });
+  };
+
+  const handleBulkMessageDelete = () => {
+    if (!messagePagination.count) {
+      toast.error("No messages available for this filter");
+      return;
+    }
+
+    const targetLabel = activeMessageFilterLabel;
+    openModal({
+      mode: "delete",
+      title:
+        messageStatusFilter === "all"
+          ? "Delete All Messages"
+          : `Delete ${targetLabel} Messages`,
+      description:
+        messageStatusFilter === "all"
+          ? "This will permanently delete every contact message in your inbox."
+          : `This will permanently delete all ${targetLabel.toLowerCase()} messages currently shown.`,
+      confirmLabel:
+        messageStatusFilter === "all" ? "Delete All" : "Delete Filtered",
+      confirmTone: "danger",
+      details: [
+        { label: "Filter", value: targetLabel },
+        { label: "Messages Selected", value: messagePagination.count },
+      ],
+      onConfirm: async () => {
+        await deleteContactMessages({ status: messageStatusFilter });
+        toast.success(
+          messageStatusFilter === "all"
+            ? "All messages removed"
+            : `${targetLabel} messages removed`
+        );
+        await refreshMessages({ includeList: true, silent: false, page: 1 });
+      },
+    });
+  };
+
+  const handleMessageDelete = (message) => {
+    handleDeleteIntent({
+      entityLabel: "Contact Message",
+      name: message.full_name || message.email || `Message #${message.id}`,
+      details: [
+        { label: "Email", value: message.email || "--" },
+        {
+          label: "Received",
+          value: message.created_at
+            ? new Date(message.created_at).toLocaleString()
+            : "--",
+        },
+      ],
+      onConfirm: async () => {
+        await deleteContactMessage(message.id);
+        toast.success("Message removed successfully");
+        const shouldGoPrev = messages.length === 1 && messagePage > 1;
+        const targetPage = shouldGoPrev ? messagePage - 1 : messagePage;
+        await refreshMessages({
+          includeList: true,
+          silent: false,
+          page: targetPage,
+        });
+      },
+    });
   };
 
   return (
@@ -1372,6 +1710,11 @@ export default function StudioManagementPage() {
               >
                 <Icon className="w-5 h-5" />
                 <span className="hidden sm:inline">{tab.label}</span>
+                {tab.id === "messages" && messageCounts.new > 0 && (
+                  <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-white/90 text-pink-600 dark:bg-gray-900/80 dark:text-pink-300 border border-pink-200/60 dark:border-pink-500/30">
+                    {messageCounts.new}
+                  </span>
+                )}
               </motion.button>
             );
           })}
@@ -1396,7 +1739,8 @@ export default function StudioManagementPage() {
                     className="font-sans text-sm"
                     style={{ color: "var(--text-soft)" }}
                   >
-                    Primary channels clients see on the public site and booking flows
+                    Primary channels clients see on the public site and booking
+                    flows
                   </p>
                 </div>
                 <motion.button
@@ -1413,61 +1757,92 @@ export default function StudioManagementPage() {
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Primary Phone
                   </label>
                   <input
                     type="tel"
                     value={contactInfo.phone}
-                    onChange={(e) => handleContactFieldChange("phone", e.target.value)}
+                    onChange={(e) =>
+                      handleContactFieldChange("phone", e.target.value)
+                    }
                     className="input-enhanced w-full px-4 py-3"
                     placeholder="0912345678"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     WhatsApp Number
                   </label>
                   <input
                     type="tel"
                     value={contactInfo.whatsapp_number}
-                    onChange={(e) => handleContactFieldChange("whatsapp_number", e.target.value)}
+                    onChange={(e) =>
+                      handleContactFieldChange(
+                        "whatsapp_number",
+                        e.target.value
+                      )
+                    }
                     className="input-enhanced w-full px-4 py-3"
                     placeholder="WhatsApp-enabled phone"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Emergency Contact
                   </label>
                   <input
                     type="tel"
                     value={contactInfo.emergency_phone}
-                    onChange={(e) => handleContactFieldChange("emergency_phone", e.target.value)}
+                    onChange={(e) =>
+                      handleContactFieldChange(
+                        "emergency_phone",
+                        e.target.value
+                      )
+                    }
                     className="input-enhanced w-full px-4 py-3"
                     placeholder="Optional backup number"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Email Address
                   </label>
                   <input
                     type="email"
                     value={contactInfo.email}
-                    onChange={(e) => handleContactFieldChange("email", e.target.value)}
+                    onChange={(e) =>
+                      handleContactFieldChange("email", e.target.value)
+                    }
                     className="input-enhanced w-full px-4 py-3"
                     placeholder="studio@example.com"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Booking Link
                   </label>
                   <input
                     type="url"
                     value={contactInfo.booking_link}
-                    onChange={(e) => handleContactFieldChange("booking_link", e.target.value)}
+                    onChange={(e) =>
+                      handleContactFieldChange("booking_link", e.target.value)
+                    }
                     className="input-enhanced w-full px-4 py-3"
                     placeholder="https://calendly.com/robelstudio"
                   />
@@ -1476,45 +1851,62 @@ export default function StudioManagementPage() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Map Embed URL
                   </label>
                   <input
                     type="url"
                     value={contactInfo.map_embed_url}
-                    onChange={(e) => handleContactFieldChange("map_embed_url", e.target.value)}
+                    onChange={(e) =>
+                      handleContactFieldChange("map_embed_url", e.target.value)
+                    }
                     className="input-enhanced w-full px-4 py-3"
                     placeholder="https://www.google.com/maps/embed?..."
                   />
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Paste the full Google Maps embed URL to power the locator section.
+                    Paste the full Google Maps embed URL to power the locator
+                    section.
                   </p>
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Studio Address
                   </label>
                   <textarea
                     rows="3"
                     value={contactInfo.address}
-                    onChange={(e) => handleContactFieldChange("address", e.target.value)}
+                    onChange={(e) =>
+                      handleContactFieldChange("address", e.target.value)
+                    }
                     className="input-enhanced w-full px-4 py-3"
                     placeholder="123 Wedding Lane, Addis Ababa"
                   />
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Office Hours
                   </label>
                   <textarea
                     rows="4"
                     value={contactInfo.office_hours}
-                    onChange={(e) => handleContactFieldChange("office_hours", e.target.value)}
+                    onChange={(e) =>
+                      handleContactFieldChange("office_hours", e.target.value)
+                    }
                     className="input-enhanced w-full px-4 py-3"
                     placeholder={"Mon-Fri: 9am - 6pm\nSat: 10am - 2pm"}
                   />
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Multi-line text supported; each line renders as a separate bullet on the landing page.
+                    Multi-line text supported; each line renders as a separate
+                    bullet on the landing page.
                   </p>
                 </div>
               </div>
@@ -1533,7 +1925,8 @@ export default function StudioManagementPage() {
                     className="font-sans text-sm"
                     style={{ color: "var(--text-soft)" }}
                   >
-                    Control badges that appear across the site footer and hero CTA ribbon ({socialLinks.length})
+                    Control badges that appear across the site footer and hero
+                    CTA ribbon ({socialLinks.length})
                   </p>
                 </div>
                 {editingSocialLink && (
@@ -1551,7 +1944,10 @@ export default function StudioManagementPage() {
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Platform Label
                   </label>
                   <input
@@ -1568,7 +1964,10 @@ export default function StudioManagementPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Icon Identifier
                   </label>
                   <select
@@ -1589,7 +1988,10 @@ export default function StudioManagementPage() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Destination URL
                   </label>
                   <input
@@ -1606,7 +2008,10 @@ export default function StudioManagementPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium font-sans" style={{ color: "var(--text)" }}>
+                  <label
+                    className="block text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
                     Display Order
                   </label>
                   <input
@@ -1636,7 +2041,10 @@ export default function StudioManagementPage() {
                       className="w-5 h-5 rounded border-2 cursor-pointer"
                       style={{ accentColor: "var(--accent)" }}
                     />
-                    <span className="font-sans text-sm font-medium" style={{ color: "var(--text)" }}>
+                    <span
+                      className="font-sans text-sm font-medium"
+                      style={{ color: "var(--text)" }}
+                    >
                       Active (visible on website)
                     </span>
                   </label>
@@ -1664,12 +2072,16 @@ export default function StudioManagementPage() {
                 )}
               </div>
               <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                All social URLs must start with https:// to pass the backend validation layer.
+                All social URLs must start with https:// to pass the backend
+                validation layer.
               </p>
 
               <div className="mt-10 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-serif font-semibold" style={{ color: "var(--text)" }}>
+                  <h3
+                    className="text-lg font-serif font-semibold"
+                    style={{ color: "var(--text)" }}
+                  >
                     Existing Links
                   </h3>
                   <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
@@ -1678,7 +2090,8 @@ export default function StudioManagementPage() {
                 </div>
                 {socialLinks.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-                    No social links yet. Add your first link above to power the landing page badges.
+                    No social links yet. Add your first link above to power the
+                    landing page badges.
                   </div>
                 ) : (
                   <div className="grid gap-4 lg:grid-cols-2">
@@ -1695,7 +2108,10 @@ export default function StudioManagementPage() {
                                 <IconPreview className="w-5 h-5" />
                               </div>
                               <div>
-                                <p className="text-base font-semibold" style={{ color: "var(--text)" }}>
+                                <p
+                                  className="text-base font-semibold"
+                                  style={{ color: "var(--text)" }}
+                                >
                                   {link.platform || "Untitled Link"}
                                 </p>
                                 <a
@@ -1709,7 +2125,11 @@ export default function StudioManagementPage() {
                               </div>
                             </div>
                             <span
-                              className={`px-3 py-1 rounded-full text-xs font-semibold ${link.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}
+                              className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                link.is_active
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-slate-200 text-slate-600"
+                              }`}
                             >
                               {link.is_active ? "Active" : "Hidden"}
                             </span>
@@ -1758,6 +2178,435 @@ export default function StudioManagementPage() {
                   </div>
                 )}
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Messages Tab */}
+        {activeTab === "messages" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            <div className="card-enhanced">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+                <div>
+                  <h2
+                    className="text-2xl font-serif font-semibold mb-2"
+                    style={{ color: "var(--text)" }}
+                  >
+                    Contact Messages
+                  </h2>
+                  <p
+                    className="font-sans text-sm"
+                    style={{ color: "var(--text-soft)" }}
+                  >
+                    Manage inquiries from your website visitors
+                    <span className="ml-2 px-2 py-1 bg-slate-300 dark:bg-slate-800 rounded-full text-xs font-semibold text-slate-800 dark:text-slate-300">
+                      {messagePagination.count} total
+                    </span>
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 items-stretch lg:items-end text-sm">
+                  <div className="flex flex-wrap items-center justify-between lg:justify-end gap-3">
+                    <div
+                      className="font-medium"
+                      style={{ color: "var(--text)" }}
+                    >
+                      Showing{" "}
+                      <span
+                        className="font-bold"
+                        style={{ color: "var(--text)" }}
+                      >
+                        {messages.length}
+                      </span>{" "}
+                      of{" "}
+                      <span
+                        className="font-bold"
+                        style={{ color: "var(--text)" }}
+                      >
+                        {messagePagination.count}
+                      </span>{" "}
+                      records
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-300 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+                      Filter: {activeMessageFilterLabel}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-3 items-center justify-end">
+                    <label
+                      className="text-xs uppercase tracking-wide font-semibold"
+                      style={{ color: "var(--text-soft)" }}
+                    >
+                      Status
+                    </label>
+                    <select
+                      value={messageStatusFilter}
+                      onChange={(e) =>
+                        handleMessageFilterChange(e.target.value)
+                      }
+                      className="px-3 py-1.5 rounded-lg border-2 border-slate-400 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 text-sm font-medium focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                    >
+                      {messageStatusOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleBulkMessageDelete}
+                      disabled={!messagePagination.count}
+                      className={`px-3 py-1.5 rounded-lg border text-sm font-semibold cursor-pointer transition-colors ${
+                        messagePagination.count
+                          ? "border-red-300 text-red-700 hover:border-red-400 hover:bg-red-50 dark:border-red-500/40 dark:text-red-500 dark:hover:border-red-400/60"
+                          : "border-slate-300 text-slate-500 cursor-not-allowed dark:border-slate-700 dark:text-slate-500"
+                      }`}
+                    >
+                      {messageStatusFilter === "all"
+                        ? "Delete All"
+                        : "Delete Filtered"}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-3 items-center justify-end">
+                    <label
+                      className="text-xs uppercase tracking-wide font-semibold"
+                      style={{ color: "var(--text-soft)" }}
+                    >
+                      Per page
+                    </label>
+                    <select
+                      value={messagePageSize}
+                      onChange={(e) =>
+                        handleMessagePageSizeChange(e.target.value)
+                      }
+                      className="px-3 py-1.5 rounded-lg border-2 border-slate-400 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 text-sm font-medium focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                    >
+                      {messagePageSizeOptions.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleMessagePageChange("prev")}
+                      disabled={messagePage <= 1}
+                      className={`px-3 py-1.5 rounded-lg border-2 text-sm font-semibold transition-colors ${
+                        messagePage <= 1
+                          ? "border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed bg-slate-200 dark:bg-slate-800"
+                          : "border-slate-500 dark:border-slate-600 text-slate-800 dark:text-slate-300 hover:border-slate-600 dark:hover:border-slate-500 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      Prev
+                    </button>
+                    <span
+                      className="text-xs font-bold"
+                      style={{ color: "var(--text-soft)" }}
+                    >
+                      Page {messagePage} of {totalMessagePages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleMessagePageChange("next")}
+                      disabled={messagePage >= totalMessagePages}
+                      className={`px-3 py-1.5 rounded-lg border-2 text-sm font-semibold transition-colors ${
+                        messagePage >= totalMessagePages
+                          ? "border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed bg-slate-200 dark:bg-slate-800"
+                          : "border-slate-500 dark:border-slate-600 text-slate-800 dark:text-slate-300 hover:border-slate-600 dark:hover:border-slate-500 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {messages.length === 0 ? (
+                <div className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-16 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 dark:bg-slate-800 flex items-center justify-center shadow-md">
+                    <svg
+                      className="w-8 h-8 text-slate-600 dark:text-slate-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+                    No messages yet
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+                    Messages from your website contact form will appear here
+                    once visitors start reaching out.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((message, index) => {
+                    const serviceLabel = resolveServiceTypeLabel(
+                      message.service_type
+                    );
+                    return (
+                      <motion.div
+                        key={message.id}
+                        className="card-enhanced group relative overflow-hidden"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: 0.05 * index }}
+                      >
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500/10 to-emerald-600/10 rounded-full -translate-y-6 translate-x-6"></div>
+                        <div className="relative p-6">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0">
+                              <div className="relative">
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-lg shadow-md">
+                                  {message.full_name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white dark:bg-slate-900 border-2 border-white dark:border-slate-900 flex items-center justify-center">
+                                  <div
+                                    className={`w-2 h-2 rounded-full ${
+                                      message.status === "new"
+                                        ? "bg-blue-500 animate-pulse"
+                                        : message.status === "read"
+                                        ? "bg-emerald-500"
+                                        : message.status === "replied"
+                                        ? "bg-purple-500"
+                                        : "bg-slate-400"
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                                <div>
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <h3
+                                      className="text-lg font-semibold truncate"
+                                      style={{ color: "var(--text)" }}
+                                    >
+                                      {message.full_name}
+                                    </h3>
+                                    <span
+                                      className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                                        message.status === "new"
+                                          ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
+                                          : message.status === "read"
+                                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                                          : message.status === "replied"
+                                          ? "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400"
+                                          : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                                      }`}
+                                    >
+                                      {message.status}
+                                    </span>
+                                  </div>
+                                  <div
+                                    className="flex flex-wrap items-center gap-4 text-sm"
+                                    style={{ color: "var(--text-soft)" }}
+                                  >
+                                    <span className="flex items-center gap-1.5">
+                                      <svg
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={1.5}
+                                          d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                        />
+                                      </svg>
+                                      {message.email}
+                                    </span>
+                                    {message.phone && (
+                                      <span className="flex items-center gap-1.5">
+                                        <svg
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={1.5}
+                                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                                          />
+                                        </svg>
+                                        {message.phone}
+                                      </span>
+                                    )}
+                                    <span className="flex items-center gap-1.5">
+                                      <svg
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={1.5}
+                                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                        />
+                                      </svg>
+                                      {new Date(
+                                        message.created_at
+                                      ).toLocaleDateString("en-US", {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                      })}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {serviceLabel && (
+                                  <div className="flex flex-col items-end gap-2">
+                                    <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                                      {serviceLabel}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div
+                                className="mt-6 p-4 rounded-lg border"
+                                style={{
+                                  background: "var(--blush)",
+                                  borderColor: "var(--accent)",
+                                  borderLeft: "4px solid var(--accent)"
+                                }}
+                              >
+                                <div className="flex items-center gap-2 mb-3">
+                                  <svg
+                                    className="w-4 h-4"
+                                    style={{ color: "var(--text-soft)" }}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={1.5}
+                                      d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+                                    />
+                                  </svg>
+                                  <span
+                                    className="text-xs font-semibold"
+                                    style={{ color: "var(--text-soft)" }}
+                                  >
+                                    Project Details
+                                  </span>
+                                </div>
+                                <p
+                                  className="text-sm leading-relaxed font-medium"
+                                  style={{ color: "var(--text)" }}
+                                >
+                                  {message.project_details}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center justify-between mt-6 pt-6 border-t border-slate-300 dark:border-slate-800">
+                                <div
+                                  className="flex items-center gap-2 text-sm font-medium"
+                                  style={{ color: "var(--text-soft)" }}
+                                >
+                                  <span>ID: {message.id}</span>
+                                  <span className="mx-2">•</span>
+                                  <span>Received via Contact Form</span>
+                                </div>
+
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                  <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-300 transition-colors">
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={1.5}
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                      />
+                                    </svg>
+                                  </button>
+
+                                  {message.status === "new" && (
+                                    <button
+                                      onClick={() =>
+                                        handleMessageStatusUpdate(
+                                          message.id,
+                                          "read"
+                                        )
+                                      }
+                                      className="px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-sm font-medium transition-colors"
+                                    >
+                                      Mark as Read
+                                    </button>
+                                  )}
+
+                                  {message.status === "read" && (
+                                    <button
+                                      onClick={() =>
+                                        handleMessageStatusUpdate(
+                                          message.id,
+                                          "replied"
+                                        )
+                                      }
+                                      className="px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-medium transition-colors"
+                                    >
+                                      Mark as Replied
+                                    </button>
+                                  )}
+
+                                  {message.status !== "archived" && (
+                                    <button
+                                      onClick={() =>
+                                        handleMessageStatusUpdate(
+                                          message.id,
+                                          "archived"
+                                        )
+                                      }
+                                      className="px-3 py-2 rounded-lg border border-slate-300 hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:hover:border-slate-600 text-slate-700 dark:text-slate-400 text-sm font-semibold transition-colors"
+                                    >
+                                      Archive
+                                    </button>
+                                  )}
+
+                                  <button
+                                    onClick={() => handleMessageDelete(message)}
+                                    className="px-3 py-2 rounded-lg border border-red-300 hover:border-red-400 hover:bg-red-50 dark:border-red-500/40 dark:hover:border-red-400/60 text-red-700 dark:text-red-300 text-sm font-semibold transition-colors"
+                                  >
+                                    Clear Message
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -2472,7 +3321,7 @@ export default function StudioManagementPage() {
                     onChange={(e) =>
                       setServiceForm({ ...serviceForm, icon: e.target.value })
                     }
-                    className="input-enhanced w-full px-4 py-3"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:border-pink-500 dark:focus:border-pink-400 focus:ring-2 focus:ring-pink-500/20 transition-all duration-200"
                   >
                     {iconOptions.map((icon) => (
                       <option key={icon} value={icon}>
@@ -2522,7 +3371,7 @@ export default function StudioManagementPage() {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors">
                     <input
                       type="checkbox"
                       checked={serviceForm.is_active}
@@ -2589,7 +3438,7 @@ export default function StudioManagementPage() {
                             className={`px-3 py-1 rounded-full text-xs font-medium ${
                               service.is_active
                                 ? "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                                : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                : "bg-slate-100 text-slate-600 dark:bg-gray-800 dark:text-gray-400"
                             }`}
                           >
                             {service.is_active ? "Active" : "Inactive"}
@@ -2668,10 +3517,10 @@ export default function StudioManagementPage() {
                         >
                           {service.gallery_count || 0} images
                         </span>
-                        <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-md text-xs">
+                        <span className="px-2 py-1 bg-slate-100 dark:bg-gray-800 rounded-md text-xs text-slate-600 dark:text-slate-300">
                           {service.icon}
                         </span>
-                        <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-md text-xs">
+                        <span className="px-2 py-1 bg-slate-100 dark:bg-gray-800 rounded-md text-xs text-slate-600 dark:text-slate-300">
                           Order: {service.order ?? 0}
                         </span>
                       </div>
@@ -3029,7 +3878,10 @@ export default function StudioManagementPage() {
                       placeholder="Category name (e.g., Weddings, Portraits)"
                       value={categoryForm.name}
                       onChange={(e) =>
-                        setCategoryForm({ ...categoryForm, name: e.target.value })
+                        setCategoryForm({
+                          ...categoryForm,
+                          name: e.target.value,
+                        })
                       }
                       className="input-enhanced flex-1 px-4 py-3"
                     />
@@ -3311,7 +4163,10 @@ export default function StudioManagementPage() {
                           <div
                             className="aspect-square overflow-hidden rounded-xl shadow-lg border-2 border-purple-100 dark:border-purple-900/30 cursor-pointer"
                             onClick={() =>
-                              setSelectedImage({ url: image.url, type: "image" })
+                              setSelectedImage({
+                                url: image.url,
+                                type: "image",
+                              })
                             }
                           >
                             <img
@@ -3426,10 +4281,8 @@ export default function StudioManagementPage() {
                         className="text-lg font-serif font-semibold"
                         style={{ color: "var(--text)" }}
                       >
-                        {
-                          services.find((s) => s.id === selectedService)?.title ||
-                          ""
-                        }
+                        {services.find((s) => s.id === selectedService)
+                          ?.title || ""}
                       </h3>
                       <p
                         className="text-sm font-sans"
@@ -3552,8 +4405,9 @@ export default function StudioManagementPage() {
                                   entityLabel: "Service Gallery Image",
                                   name:
                                     image.caption ||
-                                    services.find((s) => s.id === selectedService)
-                                      ?.title ||
+                                    services.find(
+                                      (s) => s.id === selectedService
+                                    )?.title ||
                                     "Gallery image",
                                   details: [
                                     {
@@ -4162,7 +5016,7 @@ export default function StudioManagementPage() {
                       {videos.map((video, index) => (
                         <motion.div
                           key={video.id}
-                          className="group relative"
+                          className="relative"
                           initial={{ opacity: 0, y: 20, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           transition={{
@@ -4171,10 +5025,17 @@ export default function StudioManagementPage() {
                             type: "spring",
                             stiffness: 100,
                           }}
-                          whileHover={{ y: -4, transition: { duration: 0.2 } }}
                         >
                           {/* Card Container */}
-                          <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg hover:shadow-2xl transition-all duration-300 group-hover:border-slate-300 dark:group-hover:border-slate-700">
+                          <div
+                            className="relative overflow-hidden rounded-2xl border shadow-sm"
+                            style={{
+                              background:
+                                "linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%)",
+                              borderColor: "var(--border)",
+                              boxShadow: "0 12px 30px rgba(15, 23, 42, 0.08)",
+                            }}
+                          >
                             {/* Decorative Elements */}
                             <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-pink-500/5 to-purple-600/5 rounded-full -translate-x-16 -translate-y-16"></div>
                             <div className="absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-tr from-blue-500/5 to-cyan-600/5 rounded-full translate-x-8 translate-y-8"></div>
@@ -4199,10 +5060,10 @@ export default function StudioManagementPage() {
                                   <img
                                     src={video.thumbnail_url}
                                     alt={video.title}
-                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                    className="w-full h-full object-cover"
                                     loading="lazy"
                                   />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
                                 </div>
                               ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center p-6">
@@ -4222,10 +5083,95 @@ export default function StudioManagementPage() {
                                 </div>
                               )}
 
-                              {/* Hover Overlay with Action Buttons */}
-                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/40 backdrop-blur-[2px]">
-                                <div className="flex gap-3">
-                                  <motion.button
+                              {/* Duration Badge */}
+                              {video.duration && (
+                                <div className="absolute bottom-3 left-3">
+                                  <span className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-sm text-xs font-medium text-white">
+                                    {video.duration}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Content Section */}
+                            <div className="p-5 relative" style={{ color: "var(--text)" }}>
+                              {/* Title and Meta */}
+                              <div className="mb-4">
+                                <h5
+                                  className="font-bold text-lg mb-2 line-clamp-1"
+                                  style={{ color: "var(--text)" }}
+                                >
+                                  {video.title || "Untitled Video"}
+                                </h5>
+
+                                {/* Category & Year */}
+                                <div className="flex items-center gap-3 mb-3">
+                                  {(video.category_name || video.category) && (
+                                    <span
+                                      className="px-2.5 py-1 rounded-md text-xs font-medium"
+                                      style={{
+                                        background: "var(--border-soft)",
+                                        color: "var(--text)",
+                                        border: "1px solid var(--border)",
+                                      }}
+                                    >
+                                      {video.category_name || video.category}
+                                    </span>
+                                  )}
+                                  {video.year && (
+                                    <span
+                                      className="text-xs flex items-center gap-1"
+                                      style={{ color: "var(--text-soft)" }}
+                                    >
+                                      <Calendar className="w-3 h-3" />
+                                      {video.year}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Description */}
+                                {video.description && (
+                                  <p
+                                    className="text-sm line-clamp-2 leading-relaxed"
+                                    style={{ color: "var(--text-soft)" }}
+                                  >
+                                    {video.description}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Stats Bar */}
+                              <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center gap-4">
+                                    <span
+                                      className="flex items-center gap-1.5"
+                                      style={{ color: "var(--text-soft)" }}
+                                    >
+                                      <div
+                                        className={`w-2 h-2 rounded-full ${
+                                          video.is_active
+                                            ? "bg-green-500"
+                                            : "bg-gray-400"
+                                        }`}
+                                      ></div>
+                                      {video.is_active
+                                        ? "Published"
+                                        : "Unpublished"}
+                                    </span>
+                                    <span style={{ color: "var(--text-soft)" }}>
+                                      Order:{" "}
+                                      <span
+                                        className="font-semibold"
+                                        style={{ color: "var(--text)" }}
+                                      >
+                                        {video.order}
+                                      </span>
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="mt-4 flex flex-wrap gap-3">
+                                  <button
                                     onClick={() =>
                                       handleEditIntent({
                                         entityLabel: "Video",
@@ -4247,7 +5193,8 @@ export default function StudioManagementPage() {
                                           setEditingVideo(video);
                                           setVideoForm({
                                             title: video.title || "",
-                                            description: video.description || "",
+                                            description:
+                                              video.description || "",
                                             category: video.category_id
                                               ? String(video.category_id)
                                               : "",
@@ -4259,104 +5206,36 @@ export default function StudioManagementPage() {
                                         },
                                       })
                                     }
-                                    className="p-3 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200 group/edit"
-                                    title="Edit Video"
-                                    whileHover={{ scale: 1.1, y: -2 }}
-                                    whileTap={{ scale: 0.95 }}
+                                    className="px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
+                                    style={{
+                                      background:
+                                        "linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)",
+                                      color: "white",
+                                      border: "none",
+                                    }}
                                   >
-                                    <Edit className="w-5 h-5 text-blue-600 dark:text-blue-400 group-hover/edit:text-blue-700 dark:group-hover/edit:text-blue-300" />
-                                  </motion.button>
-
-                                  <motion.button
+                                    <div className="flex items-center gap-2">
+                                      <Edit className="w-4 h-4" />
+                                      Edit
+                                    </div>
+                                  </button>
+                                  <button
                                     onClick={() => handleVideoDelete(video)}
-                                    className="p-3 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-200 group/delete"
-                                    title="Delete Video"
-                                    whileHover={{ scale: 1.1, y: -2 }}
-                                    whileTap={{ scale: 0.95 }}
+                                    className="px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
+                                    style={{
+                                      background:
+                                        "linear-gradient(135deg, rgba(248, 113, 113, 0.95) 0%, rgba(185, 28, 28, 0.95) 100%)",
+                                      color: "white",
+                                      border: "none",
+                                    }}
                                   >
-                                    <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400 group-hover/delete:text-red-700 dark:group-hover/delete:text-red-300" />
-                                  </motion.button>
+                                    <div className="flex items-center gap-2">
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete
+                                    </div>
+                                  </button>
                                 </div>
                               </div>
-
-                              {/* Duration Badge */}
-                              {video.duration && (
-                                <div className="absolute bottom-3 left-3">
-                                  <span className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-sm text-xs font-medium text-white">
-                                    {video.duration}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Content Section */}
-                            <div className="p-5 relative">
-                              {/* Title and Meta */}
-                              <div className="mb-4">
-                                <h5 className="font-bold text-lg text-slate-900 dark:text-white mb-2 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                  {video.title || "Untitled Video"}
-                                </h5>
-
-                                {/* Category & Year */}
-                                <div className="flex items-center gap-3 mb-3">
-                                  {(video.category_name || video.category) && (
-                                    <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                                      {video.category_name || video.category}
-                                    </span>
-                                  )}
-                                  {video.year && (
-                                    <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                      <Calendar className="w-3 h-3" />
-                                      {video.year}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Description */}
-                                {video.description && (
-                                  <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                                    {video.description}
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* Stats Bar */}
-                              <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                                <div className="flex items-center justify-between text-sm">
-                                  <div className="flex items-center gap-4">
-                                    <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                                      <div
-                                        className={`w-2 h-2 rounded-full ${
-                                          video.is_active
-                                            ? "bg-green-500 animate-pulse"
-                                            : "bg-gray-400"
-                                        }`}
-                                      ></div>
-                                      {video.is_active
-                                        ? "Published"
-                                        : "Unpublished"}
-                                    </span>
-                                    <span className="text-slate-500 dark:text-slate-400">
-                                      Order:{" "}
-                                      <span className="font-semibold text-slate-900 dark:text-slate-200">
-                                        {video.order}
-                                      </span>
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Glow Effect on Hover */}
-                            <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                              <div
-                                className="absolute inset-0 rounded-2xl"
-                                style={{
-                                  background:
-                                    "radial-gradient(circle at center, var(--blush) 0%, transparent 70%)",
-                                  filter: "blur(20px)",
-                                }}
-                              ></div>
                             </div>
                           </div>
                         </motion.div>

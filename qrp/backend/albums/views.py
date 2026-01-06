@@ -6,6 +6,7 @@ from django.http import HttpResponse, Http404
 from django.core.cache import cache
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
+from django.utils.html import escape
 from django.db.models import Prefetch, Count, Max
 from django.db import models
 from rest_framework import generics, status
@@ -13,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.throttling import ScopedRateThrottle
 from django.shortcuts import get_object_or_404
 from urllib.parse import urlparse
 
@@ -33,6 +35,7 @@ from .models import (
     VideoCategory,
     StudioContactInfo,
     SocialLink,
+    ContactMessage,
 )
 from .serializers import (
     AlbumSerializer, GuestMessageSerializer, AlbumListSerializer,
@@ -44,6 +47,7 @@ from .serializers import (
     VideoSerializer, VideoCategorySerializer, VideoCategoryCreateUpdateSerializer, VideoCreateUpdateSerializer,
     StudioContactInfoSerializer, StudioContactInfoUpdateSerializer,
     SocialLinkSerializer, SocialLinkCreateUpdateSerializer,
+    ContactMessageSerializer,
 )
 from .permissions import IsOwnerOrReadOnly, IsAuthenticatedOrReadOnly
 from .image_processor import ImageProcessor
@@ -888,3 +892,251 @@ class MediaItemDetailManageView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         instance.delete()
         cache.delete('studio_data')
+
+
+class ContactMessageCreateView(generics.CreateAPIView):
+    """Create contact message and send email notification"""
+    serializer_class = ContactMessageSerializer
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'contact_form'
+    
+    def get_client_ip(self, request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+    
+    def perform_create(self, serializer):
+        # Save the message with IP address
+        message = serializer.save(ip_address=self.get_client_ip(self.request))
+        
+        # Send email notification
+        self.send_email_notification(message)
+    
+    def _resolve_service_label(self, raw_value):
+        """Map a submitted service identifier to a human-friendly label."""
+        if not raw_value:
+            return None
+        value = str(raw_value).strip()
+        if not value:
+            return None
+        if value.isdigit():
+            service_title = Service.objects.filter(pk=int(value)).values_list('title', flat=True).first()
+            if service_title:
+                return service_title
+        return value
+
+    def send_email_notification(self, message):
+        """Send email notification to studio and confirmation to user"""
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings
+            
+            # Get studio contact info for recipient email
+            contact_info = StudioContactInfo.objects.filter(is_active=True).first()
+            recipient_email = contact_info.email if contact_info and contact_info.email else settings.DEFAULT_FROM_EMAIL
+            service_label = self._resolve_service_label(message.service_type)
+            studio_service_display = service_label or 'Not specified'
+            user_service_display = service_label or 'General inquiry'
+            project_details_plain = (message.project_details or '').strip()
+            escaped_details = escape(project_details_plain).replace('\n', '<br>')
+            project_details_html = escaped_details or '<em style="color:#777;">No project details provided.</em>'
+            submitted_at = message.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            phone_display = message.phone or 'Not provided'
+
+            studio_html = f"""
+<div style="font-family:Arial,Helvetica,sans-serif;background-color:#f5f5f5;padding:24px;">
+    <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,0.08);">
+        <div style="background:linear-gradient(120deg,#111,#5a5a5a);padding:20px;color:#ffffff;">
+            <p style="margin:0;font-size:14px;letter-spacing:0.15em;text-transform:uppercase;">Robel Studio</p>
+            <h2 style="margin:4px 0 0;font-weight:600;">New Contact Message</h2>
+        </div>
+        <div style="padding:24px 28px;">
+            <p style="margin:0 0 16px;color:#444;font-size:15px;">Hi Team, you've received a new inquiry via the website.</p>
+            <div style="border:1px solid #eee;border-radius:10px;padding:18px;">
+                <p style="margin:0 0 10px;font-size:15px;color:#111;"><strong>Name:</strong> {escape(message.full_name)}</p>
+                <p style="margin:0 0 10px;font-size:15px;color:#111;"><strong>Email:</strong> {escape(message.email)}</p>
+                <p style="margin:0 0 10px;font-size:15px;color:#111;"><strong>Phone:</strong> {escape(phone_display)}</p>
+                <p style="margin:0 0 10px;font-size:15px;color:#111;"><strong>Service Type:</strong> {escape(studio_service_display)}</p>
+                <div style="margin-top:16px;">
+                    <p style="margin:0 0 6px;font-size:15px;color:#111;"><strong>Project Details</strong></p>
+                    <div style="background:#fafafa;border-radius:8px;padding:14px;color:#333;font-size:14px;line-height:1.6;">{project_details_html}</div>
+                </div>
+            </div>
+            <p style="margin:20px 0 0;font-size:13px;color:#777;">Submitted on {submitted_at} from IP {message.ip_address or 'Unavailable'}.</p>
+        </div>
+        <div style="background-color:#111;color:#ddd;text-align:center;padding:14px;font-size:12px;letter-spacing:0.05em;">
+            Robel Studio Dashboard • Please respond within 24h
+        </div>
+    </div>
+</div>
+"""
+            studio_message = (
+                f"New contact message received:\n\n"
+                f"Name: {message.full_name}\n"
+                f"Email: {message.email}\n"
+                f"Phone: {phone_display}\n"
+                f"Service Type: {studio_service_display}\n\n"
+                f"Message:\n{project_details_plain or 'No project details provided.'}\n\n"
+                f"Submitted: {submitted_at}\n\n"
+                "You can view and manage this message in the admin panel."
+            )
+
+            send_mail(
+                f'New Contact Message from {message.full_name}',
+                studio_message,
+                settings.DEFAULT_FROM_EMAIL,
+                [recipient_email],
+                fail_silently=True,
+                html_message=studio_html,
+            )
+
+            # Confirmation email to user
+            user_subject = 'Thank you for contacting Robel Studio'
+            snippet_source = project_details_plain or 'No additional details provided.'
+            user_snippet = snippet_source[:200] + ('...' if len(snippet_source) > 200 else '')
+            user_html = f"""
+<div style="font-family:Arial,Helvetica,sans-serif;background-color:#f5f5f5;padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 6px 14px rgba(0,0,0,0.07);">
+        <div style="background:#111;padding:18px 20px;color:#fff;">
+            <h2 style="margin:0;font-weight:600;">Thank You, {escape(message.full_name)}!</h2>
+            <p style="margin:6px 0 0;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;">We received your message</p>
+        </div>
+        <div style="padding:24px 28px;">
+            <p style="margin:0 0 14px;color:#444;font-size:15px;">Our team will respond within 24 hours. Here's a quick summary:</p>
+            <p style="margin:0 0 8px;font-size:14px;color:#111;"><strong>Service Type:</strong> {escape(user_service_display)}</p>
+            <p style="margin:0 0 8px;font-size:14px;color:#111;"><strong>Submitted:</strong> {submitted_at}</p>
+            <div style="margin-top:16px;background:#fafafa;border-radius:8px;padding:14px;color:#555;font-size:14px;line-height:1.6;">{escape(user_snippet)}</div>
+            <p style="margin:18px 0 0;font-size:14px;color:#444;">If you need to add more details, simply reply to this email.</p>
+        </div>
+        <div style="background:#111;color:#ddd;text-align:center;padding:12px;font-size:12px;">
+            Robel Studio • Capturing timeless stories
+        </div>
+    </div>
+</div>
+"""
+            user_message = (
+                f"Dear {message.full_name},\n\n"
+                "Thank you for contacting Robel Studio! We have received your message and will get back to you within 24 hours.\n\n"
+                f"Service Type: {user_service_display}\n"
+                f"Submitted: {submitted_at}\n"
+                f"Message Preview: {user_snippet}\n\n"
+                "We look forward to working with you!\n\n"
+                "Best regards,\nRobel Studio Team\n\n"
+                "Note: This is an automated message. Please do not reply to this email."
+            )
+
+            send_mail(
+                user_subject,
+                user_message,
+                settings.DEFAULT_FROM_EMAIL,
+                [message.email],
+                fail_silently=True,
+                html_message=user_html,
+            )
+            
+        except Exception as e:
+            # Log the error but don't fail the request
+            print(f"Email sending failed: {str(e)}")
+
+
+class ContactMessageManageView(generics.ListAPIView):
+    """List contact messages for studio management"""
+    serializer_class = ContactMessageSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = AlbumPagination
+    
+    def get_queryset(self):
+        queryset = ContactMessage.objects.all().order_by('-created_at')
+        status_param = self.request.query_params.get('status')
+        if status_param in dict(ContactMessage.STATUS_CHOICES):
+            queryset = queryset.filter(status=status_param)
+        return queryset
+
+    def delete(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        deleted_count = queryset.count()
+        if deleted_count == 0:
+            return Response({
+                'deleted': 0,
+                'detail': 'No messages matched the provided filter.'
+            }, status=status.HTTP_200_OK)
+        queryset.delete()
+        return Response({
+            'deleted': deleted_count,
+            'detail': f'Deleted {deleted_count} contact message(s).'
+        }, status=status.HTTP_200_OK)
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        
+        if page is not None:
+            data = []
+            for message in page:
+                data.append({
+                    'id': message.id,
+                    'full_name': message.full_name,
+                    'email': message.email,
+                    'phone': message.phone,
+                    'service_type': message.service_type,
+                    'project_details': message.project_details,
+                    'status': message.status,
+                    'created_at': message.created_at,
+                    'updated_at': message.updated_at,
+                })
+            return self.get_paginated_response(data)
+        
+        data = []
+        for message in queryset:
+            data.append({
+                'id': message.id,
+                'full_name': message.full_name,
+                'email': message.email,
+                'phone': message.phone,
+                'service_type': message.service_type,
+                'project_details': message.project_details,
+                'status': message.status,
+                'created_at': message.created_at,
+                'updated_at': message.updated_at,
+            })
+        return Response(data)
+
+
+class ContactMessageDetailManageView(generics.RetrieveUpdateDestroyAPIView):
+    """Manage individual contact message"""
+    permission_classes = [IsAuthenticated]
+    queryset = ContactMessage.objects.all()
+    
+    def get_serializer_class(self):
+        return ContactMessageSerializer
+    
+    def get(self, request, *args, **kwargs):
+        message = self.get_object()
+        # Mark as read when viewed
+        if message.status == 'new':
+            message.status = 'read'
+            message.save()
+        
+        return Response({
+            'id': message.id,
+            'full_name': message.full_name,
+            'email': message.email,
+            'phone': message.phone,
+            'service_type': message.service_type,
+            'project_details': message.project_details,
+            'status': message.status,
+            'ip_address': message.ip_address,
+            'created_at': message.created_at,
+            'updated_at': message.updated_at,
+        })
+    
+    def patch(self, request, *args, **kwargs):
+        message = self.get_object()
+        if 'status' in request.data:
+            message.status = request.data['status']
+            message.save()
+        return self.get(request, *args, **kwargs)

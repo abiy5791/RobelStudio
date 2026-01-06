@@ -19,6 +19,7 @@ from .models import (
     VideoCategory,
     StudioContactInfo,
     SocialLink,
+    ContactMessage,
 )
 
 
@@ -546,3 +547,28 @@ class VideoCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Video
         fields = ['title', 'description', 'category', 'video_file', 'thumbnail', 'duration', 'year', 'order', 'is_active']
+
+
+class ContactMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactMessage
+        fields = ['full_name', 'email', 'phone', 'service_type', 'project_details']
+        
+    def validate_email(self, value):
+        return value.lower().strip()
+        
+    def validate_full_name(self, value):
+        return value.strip()
+        
+    def validate_phone(self, value):
+        if value:
+            return value.strip()
+        return value
+        
+    def validate_service_type(self, value):
+        if value:
+            return value.strip()
+        return value
+        
+    def validate_project_details(self, value):
+        return value.strip()

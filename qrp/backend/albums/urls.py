@@ -14,6 +14,7 @@ from .views import (
     VideoCategoryManageView, VideoCategoryDetailManageView, VideoManageView,
     VideoDetailManageView, BulkUploadVideosView,
     StudioContactManageView, SocialLinkManageView, SocialLinkDetailManageView,
+    ContactMessageCreateView, ContactMessageManageView, ContactMessageDetailManageView,
 )
 from .auth_views import RegisterView, LoginView, UserProfileView
 
@@ -65,4 +66,9 @@ urlpatterns = [
     path('manage/videos/', VideoManageView.as_view(), name='manage-videos'),
     path('manage/videos/<int:pk>/', VideoDetailManageView.as_view(), name='manage-video-detail'),
     path('uploads/videos/', BulkUploadVideosView.as_view(), name='bulk-upload-videos'),
+    
+    # Contact message endpoints
+    path('contact/', ContactMessageCreateView.as_view(), name='contact-message-create'),
+    path('manage/messages/', ContactMessageManageView.as_view(), name='manage-contact-messages'),
+    path('manage/messages/<int:pk>/', ContactMessageDetailManageView.as_view(), name='manage-contact-message-detail'),
 ]

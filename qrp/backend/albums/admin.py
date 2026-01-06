@@ -16,6 +16,7 @@ from .models import (
     Video,
     StudioContactInfo,
     SocialLink,
+    ContactMessage,
 )
 
 class PhotoInline(admin.TabularInline):
@@ -155,3 +156,24 @@ class VideoAdmin(admin.ModelAdmin):
     list_filter = ('category', 'is_active', 'year')
     list_editable = ('order', 'is_active')
     search_fields = ('title', 'description')
+
+
+@admin.register(ContactMessage)
+class ContactMessageAdmin(admin.ModelAdmin):
+    list_display = ('full_name', 'email', 'service_type', 'status', 'created_at')
+    list_filter = ('status', 'service_type', 'created_at')
+    list_editable = ('status',)
+    search_fields = ('full_name', 'email', 'project_details')
+    readonly_fields = ('ip_address', 'created_at', 'updated_at')
+    
+    fieldsets = (
+        ('Contact Information', {
+            'fields': ('full_name', 'email', 'phone')
+        }),
+        ('Message Details', {
+            'fields': ('service_type', 'project_details')
+        }),
+        ('Status & Metadata', {
+            'fields': ('status', 'ip_address', 'created_at', 'updated_at')
+        }),
+    )

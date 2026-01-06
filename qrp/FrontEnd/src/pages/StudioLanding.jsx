@@ -351,6 +351,18 @@ export default function StudioLanding() {
     return studioData.videos.filter((video) => video.category === videoFilter);
   }, [videoFilter, studioData.videos]);
 
+  const serviceTypeOptions = useMemo(() => {
+    if (!Array.isArray(studioData.services) || !studioData.services.length) {
+      return [];
+    }
+    return studioData.services
+      .filter((service) => service?.is_active !== false && service?.title)
+      .map((service) => ({
+        value: service?.id ? String(service.id) : service.title,
+        label: service.title,
+      }));
+  }, [studioData.services]);
+
   const itemsPerPage = 3;
   const totalPages = useMemo(() => {
     const total = Array.isArray(studioData.testimonials)
@@ -771,25 +783,41 @@ export default function StudioLanding() {
     setIsSubmitting(true);
 
     try {
-      // Simulate form submission
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const response = await fetch('/api/contact/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          full_name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          service_type: formData.serviceType,
+          project_details: formData.projectDetails,
+        }),
+      });
 
-      // Reset form
-      setFormData({
-        fullName: "",
-        email: "",
-        phone: "",
-        serviceType: "",
-        projectDetails: "",
-      });
-      setFormStatus({
-        type: "success",
-        message: "Message sent! We'll get back to you within 24 hours.",
-      });
+      if (response.ok) {
+        // Reset form
+        setFormData({
+          fullName: "",
+          email: "",
+          phone: "",
+          serviceType: "",
+          projectDetails: "",
+        });
+        setFormStatus({
+          type: "success",
+          message: "Message sent! We'll get back to you within 24 hours.",
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to send message');
+      }
     } catch (error) {
       setFormStatus({
         type: "error",
-        message: "Failed to send message. Please try again.",
+        message: error.message || "Failed to send message. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -806,6 +834,19 @@ export default function StudioLanding() {
     );
     return () => clearTimeout(timeoutId);
   }, [formStatus]);
+
+  useEffect(() => {
+    if (!formData.serviceType) {
+      return undefined;
+    }
+    const validValues = new Set(
+      serviceTypeOptions.map((option) => option.value).concat("other")
+    );
+    if (!validValues.has(formData.serviceType)) {
+      setFormData((prev) => ({ ...prev, serviceType: "" }));
+    }
+    return undefined;
+  }, [formData.serviceType, serviceTypeOptions]);
 
   const toggleTheme = () => {
     const newDarkMode = !isDarkMode;
@@ -951,7 +992,7 @@ export default function StudioLanding() {
                   className={`text-sm font-medium transition-colors ${
                     isDarkMode
                       ? "text-white/80 hover:text-white"
-                      : "text-slate-900/80 hover:text-slate-900"
+                      : "text-pink-700 hover:text-pink-600"
                   }`}
                 >
                   {label}
@@ -2744,16 +2785,21 @@ export default function StudioLanding() {
                       onChange={handleInputChange}
                       className={`w-full px-4 py-4 border rounded-xl focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 focus:outline-none transition-all duration-300 ${
                         isDarkMode
-                          ? "bg-slate-800/30 border-slate-700/50 text-white"
+                          ? "bg-slate-900 border-slate-700/50 text-white"
                           : "bg-white border-slate-300 text-slate-900"
                       }`}
                     >
-                      <option value="">Select a service</option>
-                      <option value="wedding">Wedding Photography</option>
-                      <option value="portrait">Portrait Session</option>
-                      <option value="event">Event Photography</option>
-                      <option value="maternity">Maternity & Family</option>
-                      <option value="other">Other</option>
+                      <option value="">
+                        {serviceTypeOptions.length
+                          ? "Select a service"
+                          : "No services available"}
+                      </option>
+                      {serviceTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                      <option value="other">Other / Custom Request</option>
                     </select>
                   </div>
                 </div>
@@ -3145,29 +3191,53 @@ export default function StudioLanding() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-4"
+          className={`fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center p-4 ${
+            isDarkMode ? "bg-slate-950/95" : "bg-white/95"
+          }`}
           onClick={() => setSelectedService(null)}
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="relative max-w-4xl w-full max-h-[90vh] bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-700/50 overflow-hidden"
+            className={`relative max-w-4xl w-full max-h-[90vh] backdrop-blur-md rounded-2xl border overflow-hidden ${
+              isDarkMode
+                ? "bg-slate-900/50 border-slate-700/50"
+                : "bg-white/90 border-slate-200/60"
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-slate-700/50 p-6">
+            <div
+              className={`sticky top-0 z-10 backdrop-blur-md border-b p-6 ${
+                isDarkMode
+                  ? "bg-slate-900/80 border-slate-700/50"
+                  : "bg-white/95 border-slate-200/60"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-semibold text-white font-display">
+                  <h3
+                    className={`text-xl font-semibold font-display ${
+                      isDarkMode ? "text-white" : "text-slate-900"
+                    }`}
+                  >
                     {selectedService.title}
                   </h3>
-                  <p className="text-slate-400 text-sm mt-1">
+                  <p
+                    className={`text-sm mt-1 ${
+                      isDarkMode ? "text-slate-400" : "text-slate-600"
+                    }`}
+                  >
                     {selectedService.description}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedService(null)}
-                  className="w-10 h-10 bg-slate-800/80 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                    isDarkMode
+                      ? "bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700"
+                      : "bg-slate-200/80 text-slate-700 hover:text-slate-900 hover:bg-slate-300"
+                  }`}
                 >
                   <FiX size={20} />
                 </button>
@@ -3192,15 +3262,34 @@ export default function StudioLanding() {
                       className="w-full h-auto object-cover transition-all duration-700 group-hover:scale-105"
                       loading="lazy"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div
+                      className={`absolute inset-0 bg-gradient-to-t ${
+                        isDarkMode
+                          ? "from-slate-950/60"
+                          : "from-black/20"
+                      } via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
+                    >
                       <div className="absolute bottom-4 left-4">
-                        <span className="text-white text-sm font-medium bg-slate-900/80 backdrop-blur-sm px-3 py-1 rounded-full">
+                        <span
+                          className={`text-sm font-medium backdrop-blur-sm px-3 py-1 rounded-full ${
+                            isDarkMode
+                              ? "bg-slate-900/80 text-white"
+                              : "bg-white/80 text-slate-900"
+                          }`}
+                        >
                           {idx + 1} of {selectedService.gallery_images.length}
                         </span>
                       </div>
                       <div className="absolute top-4 right-4">
-                        <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                          <FiMaximize2 size={14} className="text-white" />
+                        <div
+                          className={`w-8 h-8 backdrop-blur-sm rounded-full flex items-center justify-center ${
+                            isDarkMode ? "bg-white/20" : "bg-slate-900/10"
+                          }`}
+                        >
+                          <FiMaximize2
+                            size={14}
+                            className={isDarkMode ? "text-white" : "text-slate-900"}
+                          />
                         </div>
                       </div>
                     </div>
@@ -3218,7 +3307,9 @@ export default function StudioLanding() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4"
+          className={`fixed inset-0 z-[60] backdrop-blur-xl flex items-center justify-center p-4 ${
+            isDarkMode ? "bg-slate-950/95" : "bg-white/95"
+          }`}
           onClick={() => {
             setSelectedServiceImage(null);
             setZoomLevel(1);
@@ -3233,7 +3324,11 @@ export default function StudioLanding() {
               setPanX(0);
               setPanY(0);
             }}
-            className="absolute top-6 right-6 w-12 h-12 bg-slate-800/80 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-all duration-300 hover:scale-110 z-10"
+            className={`absolute top-6 right-6 w-12 h-12 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 z-10 ${
+              isDarkMode
+                ? "bg-slate-800/80 text-white hover:bg-slate-700"
+                : "bg-slate-200/80 text-slate-900 hover:bg-slate-300"
+            }`}
           >
             <FiX size={20} />
           </button>
@@ -3334,8 +3429,16 @@ export default function StudioLanding() {
                 transition: isDragging ? "none" : "transform 0.3s ease",
               }}
             />
-            <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-md rounded-full px-4 py-2">
-              <span className="text-white text-sm font-medium">
+            <div
+              className={`absolute -bottom-12 left-1/2 -translate-x-1/2 backdrop-blur-md rounded-full px-4 py-2 ${
+                isDarkMode ? "bg-slate-900/80" : "bg-white/80"
+              }`}
+            >
+              <span
+                className={`text-sm font-medium ${
+                  isDarkMode ? "text-white" : "text-slate-900"
+                }`}
+              >
                 {currentServiceImageIndex + 1} /{" "}
                 {selectedService?.gallery_images.length}
               </span>
