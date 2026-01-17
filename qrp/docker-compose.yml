@@ -1,0 +1,42 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: robelstudio-backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DJANGO_DEBUG: "false"
+      DJANGO_SECRET_KEY: "change-me"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DJANGO_USE_WHITENOISE: "true"
+      DJANGO_CORS_ALLOW_ALL_ORIGINS: "false"
+      # Put sqlite outside the code dir so it can be persisted cleanly
+      DJANGO_DB_PATH: "/data/db.sqlite3"
+      # If you terminate TLS at a reverse proxy, you can disable redirect inside container:
+      # DJANGO_SECURE_SSL_REDIRECT: "false"
+    volumes:
+      - backend_data:/data
+      - backend_media:/app/media
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./FrontEnd
+      args:
+        # Defaults to same-origin (best for nginx proxy). Override if you must.
+        VITE_API_BASE: ""
+        VITE_API_URL: "/api"
+    container_name: robelstudio-frontend
+    depends_on:
+      - backend
+    ports:
+      # Frontend on http://localhost:5173
+      - "5173:80"
+    restart: unless-stopped
+
+volumes:
+  backend_data:
+  backend_media:
