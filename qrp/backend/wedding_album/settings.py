@@ -23,7 +23,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'albums',
+    'albums.apps.AlbumsConfig',
 ]
 
 MIDDLEWARE = [

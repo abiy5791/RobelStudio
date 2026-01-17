@@ -1,6 +1,7 @@
 import re
 from rest_framework import serializers
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Count
 from .models import (
     Album,
@@ -258,24 +259,79 @@ class AlbumSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         photos_data = validated_data.pop('photos', None)
 
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
+        with transaction.atomic():
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
 
-        if photos_data is not None:
-            instance.photos.all().delete()
-            for idx, photo_data in enumerate(photos_data):
-                if isinstance(photo_data, str):
-                    Photo.objects.create(
-                        album=instance, order=idx, url=photo_data)
-                else:
+            # IMPORTANT: Do NOT delete all existing photos when editing an album.
+            # That caused media files to be removed from disk even when the user
+            # was only adding new photos.
+            if photos_data is None:
+                return instance
+
+            existing_photos = list(instance.photos.all())
+            existing_by_id = {p.id: p for p in existing_photos}
+            # Fallback matching by URL (useful if client doesn't send ids)
+            existing_by_url = {}
+            for p in existing_photos:
+                existing_by_url.setdefault(p.url, []).append(p)
+
+            kept_ids = set()
+
+            def normalize_photo_item(item):
+                if isinstance(item, str):
+                    return {'url': item, 'thumbnail_url': '', 'medium_url': '', 'id': None}
+                if isinstance(item, dict):
+                    return {
+                        'id': item.get('id'),
+                        'url': item.get('url') or '',
+                        'thumbnail_url': item.get('thumbnail_url') or '',
+                        'medium_url': item.get('medium_url') or '',
+                    }
+                # Unknown format, ignore safely
+                return {'url': '', 'thumbnail_url': '', 'medium_url': '', 'id': None}
+
+            for idx, raw in enumerate(photos_data):
+                item = normalize_photo_item(raw)
+                photo_obj = None
+
+                # Prefer stable matching by id
+                if item.get('id') in existing_by_id:
+                    photo_obj = existing_by_id[item['id']]
+
+                # Fallback matching by url
+                if photo_obj is None and item.get('url') and item['url'] in existing_by_url and existing_by_url[item['url']]:
+                    photo_obj = existing_by_url[item['url']].pop(0)
+
+                if photo_obj is None:
+                    # New photo
                     Photo.objects.create(
                         album=instance,
                         order=idx,
-                        url=photo_data.get('url', photo_data),
-                        thumbnail_url=photo_data.get('thumbnail_url', ''),
-                        medium_url=photo_data.get('medium_url', ''),
+                        url=item.get('url', ''),
+                        thumbnail_url=item.get('thumbnail_url', ''),
+                        medium_url=item.get('medium_url', ''),
                     )
+                else:
+                    kept_ids.add(photo_obj.id)
+                    # Update order + urls (if the client changed them)
+                    changed = False
+                    if photo_obj.order != idx:
+                        photo_obj.order = idx
+                        changed = True
+                    for field in ('url', 'thumbnail_url', 'medium_url'):
+                        new_val = item.get(field, '')
+                        if new_val and getattr(photo_obj, field) != new_val:
+                            setattr(photo_obj, field, new_val)
+                            changed = True
+                    if changed:
+                        photo_obj.save()
+
+            # Delete only photos that were actually removed from the submitted list
+            for p in existing_photos:
+                if p.id not in kept_ids:
+                    p.delete()
 
         return instance
 

@@ -1011,10 +1011,10 @@ export default function StudioLanding() {
               </div>
               <button
                 onClick={toggleTheme}
-                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                className={`w-10 h-10 rounded-lg flex items-center cursor-pointer justify-center transition-colors ${
                   isDarkMode
                     ? "bg-white/10 border border-white/20 text-white hover:bg-white/20"
-                    : "bg-black/10 border border-black/20 text-slate-900 hover:bg-black/20"
+                    : "bg-rose-500/10 border border-rose-500/60 text-rose-300 hover:bg-rose-500/80"
                 }`}
               >
                 {isDarkMode ? <FiSun size={18} /> : <FiMoon size={18} />}

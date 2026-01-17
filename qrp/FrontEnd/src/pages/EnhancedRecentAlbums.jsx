@@ -234,9 +234,9 @@ export default function EnhancedRecentAlbums() {
                         {a.cover_photo || a.photos?.[0] ? (
                           <img 
                             src={getImageUrl(
-                              a.cover_photo?.thumbnail_url || 
+                              a.cover_photo?.medium_url || 
                               a.cover_photo?.url || 
-                              (typeof a.photos?.[0] === 'string' ? a.photos[0] : (a.photos[0]?.thumbnail_url || a.photos[0]?.url))
+                              (typeof a.photos?.[0] === 'string' ? a.photos[0] : (a.photos[0]?.medium_url || a.photos[0]?.url))
                             )} 
                             alt={`${a.names} album`} 
                             loading="lazy"

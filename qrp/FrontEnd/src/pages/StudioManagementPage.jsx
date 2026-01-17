@@ -170,15 +170,16 @@ const stringifyFieldErrors = (data) => {
         : typeof value === "string"
         ? value
         : JSON.stringify(value);
-      return normalizedField
+      const line = normalizedField
         ? `${normalizedField}: ${normalizedValue}`
         : normalizedValue;
+      return line ? `• ${line}` : null;
     })
     .filter(Boolean)
-    .join(" | ");
+    .join("\n");
 };
 
-const parseErrorMessage = (error, fallback = "Something went wrong") => {
+const parseErrorMessage = (error, fallback = "Something went wrong.") => {
   if (!error) return fallback;
   if (typeof error === "string") return error;
   if (error?.response) {
@@ -200,6 +201,80 @@ const parseErrorMessage = (error, fallback = "Something went wrong") => {
   if (error.response?.data?.detail) return error.response.data.detail;
   if (error.message) return error.message;
   return fallback;
+};
+
+const getHttpStatus = (error) => {
+  const status = error?.response?.status;
+  return typeof status === "number" ? status : null;
+};
+
+const stripHtmlIfLikely = (text) => {
+  const str = String(text ?? "");
+  if (!/[<>]/.test(str)) return str;
+  return str.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+};
+
+const redactSensitive = (text) => {
+  let str = String(text ?? "");
+
+  // Redact common auth/token patterns.
+  str = str.replace(/\bBearer\s+[A-Za-z0-9\-_.~+/]+=*\b/gi, "Bearer [REDACTED]");
+  str = str.replace(/\b(access[_-]?token|refresh[_-]?token|token|api[_-]?key)\b\s*[:=]\s*[^\s"']+/gi, "$1=[REDACTED]");
+  str = str.replace(/\bAuthorization\b\s*[:=]\s*[^\n]+/gi, "Authorization: [REDACTED]");
+
+  // Redact JWT-like values anywhere in text.
+  str = str.replace(/\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[REDACTED_JWT]");
+
+  // Redact long base64-ish blobs.
+  str = str.replace(/[A-Za-z0-9+/]{80,}={0,2}/g, "[REDACTED_BLOB]");
+
+  return str;
+};
+
+const normalizeForDisplay = (text) => {
+  const str = redactSensitive(stripHtmlIfLikely(text));
+  // Prevent pathological huge messages from locking the UI.
+  const max = 6000;
+  if (str.length <= max) return str;
+  return `${str.slice(0, max)}\n… (truncated)`;
+};
+
+const professionalizeFallback = (fallback) => {
+  if (!fallback) return null;
+  const trimmed = String(fallback).trim();
+  if (!trimmed) return null;
+  if (/^Failed to\s+/i.test(trimmed)) {
+    const rest = trimmed
+      .replace(/^Failed to\s+/i, "")
+      .replace(/\.+$/g, "")
+      .trim();
+    return rest ? `Unable to ${rest}.` : "We couldn't complete your request.";
+  }
+  return trimmed.endsWith(".") ? trimmed : `${trimmed}.`;
+};
+
+const formatErrorForUi = (error, fallbackMessage) => {
+  const status = getHttpStatus(error);
+  const baseHeadline =
+    professionalizeFallback(fallbackMessage) || "We couldn't complete your request.";
+  const headline = status ? `${baseHeadline} (HTTP ${status})` : baseHeadline;
+
+  const rawDetail = parseErrorMessage(error, null);
+  const detail = rawDetail ? normalizeForDisplay(rawDetail) : null;
+
+  // Security: avoid leaking server internals to end users on 5xx in production.
+  const isServerError = typeof status === "number" && status >= 500;
+  const allowDetails = import.meta.env.DEV || !isServerError;
+
+  if (!detail || !allowDetails) {
+    return isServerError && !import.meta.env.DEV
+      ? "An internal server error occurred. Please try again in a moment."
+      : headline;
+  }
+
+  const normalizedDetail = String(detail).trim();
+  if (!normalizedDetail || normalizedDetail === headline) return headline;
+  return `${headline}\n${normalizedDetail}`;
 };
 
 function ActionModal({
@@ -329,8 +404,10 @@ function ActionModal({
 
         {errorMessage && (
           <div className="flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-700 dark:text-red-200">
-            <AlertCircle className="w-4 h-4 mt-0.5" />
-            <span>{errorMessage}</span>
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0 whitespace-pre-wrap break-words max-h-32 overflow-auto pr-1">
+              {errorMessage}
+            </div>
           </div>
         )}
 
@@ -504,9 +581,16 @@ export default function StudioManagementPage() {
   };
 
   const notifyError = (error, fallbackMessage) => {
-    const message = parseErrorMessage(error, fallbackMessage);
+    const message = formatErrorForUi(error, fallbackMessage);
     setGlobalError(message);
-    toast.error(message);
+    toast.error(message, {
+      duration: 10000,
+      style: {
+        maxWidth: "42rem",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+      },
+    });
     return message;
   };
 
@@ -536,7 +620,7 @@ export default function StudioManagementPage() {
       await Promise.resolve(modalConfig.onConfirm());
       closeModal();
     } catch (error) {
-      const message = parseErrorMessage(error, "Failed to complete action");
+      const message = formatErrorForUi(error, "Failed to complete action");
       setModalError(message);
       setGlobalError(message);
     } finally {
@@ -1672,7 +1756,9 @@ export default function StudioManagementPage() {
           >
             <div className="flex items-start gap-3 rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
               <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
-              <div className="flex-1 leading-relaxed">{globalError}</div>
+              <div className="flex-1 min-w-0 leading-relaxed whitespace-pre-wrap break-words max-h-40 overflow-auto pr-2">
+                {globalError}
+              </div>
               <button
                 onClick={() => setGlobalError(null)}
                 className="p-1 rounded-full text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40"

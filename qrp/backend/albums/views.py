@@ -785,16 +785,6 @@ class VideoDetailManageView(generics.RetrieveUpdateDestroyAPIView):
     def get_serializer_context(self):
         return {'request': self.request}
 
-    def patch(self, request, *args, **kwargs):
-        # Convert category string to int before processing
-        if 'category' in request.data:
-            mutable_data = request.data.copy()
-            category_value = mutable_data.get('category')
-            if isinstance(category_value, str) and category_value.isdigit():
-                mutable_data['category'] = int(category_value)
-            request._full_data = mutable_data
-        return super().patch(request, *args, **kwargs)
-
     def perform_update(self, serializer):
         serializer.save()
         cache.delete('studio_data')
