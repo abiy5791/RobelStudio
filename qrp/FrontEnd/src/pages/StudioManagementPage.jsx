@@ -14,6 +14,7 @@ import {
   Save,
   X,
   Eye,
+  EyeOff,
   GripVertical,
   Film,
   AlertCircle,
@@ -515,10 +516,12 @@ export default function StudioManagementPage() {
 
   // Media items state
   const [mediaItems, setMediaItems] = useState([]);
+  const [editingMediaItem, setEditingMediaItem] = useState(null);
   const [mediaForm, setMediaForm] = useState({
     title: "",
     media_type: "image",
     file: null,
+    is_active: true,
   });
   const [selectedImage, setSelectedImage] = useState(null);
 
@@ -1498,6 +1501,21 @@ export default function StudioManagementPage() {
     }
   };
 
+  const resetMediaForm = () => {
+    setEditingMediaItem(null);
+    setMediaForm({ title: "", media_type: "image", file: null, is_active: true });
+  };
+
+  const startMediaItemEdit = (item) => {
+    setEditingMediaItem(item);
+    setMediaForm({
+      title: item?.title || "",
+      media_type: item?.media_type || "image",
+      file: null,
+      is_active: item?.is_active !== false,
+    });
+  };
+
   const handleMediaItemSave = async () => {
     setLoading(true);
     setUploadProgress(0);
@@ -1505,12 +1523,13 @@ export default function StudioManagementPage() {
       const formData = new FormData();
       formData.append("title", mediaForm.title);
       formData.append("media_type", mediaForm.media_type);
+      formData.append("is_active", mediaForm.is_active ? "true" : "false");
       if (mediaForm.file) {
         formData.append("file", mediaForm.file);
       }
 
       // Use XHR for progress tracking
-      const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+      const API_BASE = import.meta.env.VITE_API_BASE || "";
       const token = localStorage.getItem("access_token");
 
       await new Promise((resolve, reject) => {
@@ -1535,15 +1554,19 @@ export default function StudioManagementPage() {
           reject(new Error("Upload failed"));
         });
 
-        xhr.open("POST", `${API_BASE}/api/manage/media-items/`);
+        const isEdit = Boolean(editingMediaItem?.id);
+        const url = isEdit
+          ? `${API_BASE}/api/manage/media-items/${editingMediaItem.id}/`
+          : `${API_BASE}/api/manage/media-items/`;
+        xhr.open(isEdit ? "PATCH" : "POST", url);
         if (token) {
           xhr.setRequestHeader("Authorization", `Bearer ${token}`);
         }
         xhr.send(formData);
       });
 
-      toast.success("Media item added successfully");
-      setMediaForm({ title: "", media_type: "image", file: null });
+      toast.success(editingMediaItem ? "Media item updated successfully" : "Media item added successfully");
+      resetMediaForm();
       loadData();
     } catch (error) {
       notifyError(error, "Failed to upload media item");
@@ -2935,18 +2958,57 @@ export default function StudioManagementPage() {
                     </div>
                   </div>
                 </div>
+
+                <div className="md:col-span-2 flex items-center justify-between gap-4">
+                  <label
+                    className="flex items-center gap-3 text-sm font-medium font-sans"
+                    style={{ color: "var(--text)" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(mediaForm.is_active)}
+                      onChange={(e) =>
+                        setMediaForm({ ...mediaForm, is_active: e.target.checked })
+                      }
+                      className="w-4 h-4"
+                    />
+                    Visible (is_active)
+                  </label>
+
+                  {editingMediaItem && (
+                    <button
+                      type="button"
+                      onClick={resetMediaForm}
+                      className="px-4 py-2 rounded-lg border text-sm font-medium transition-colors"
+                      style={{
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                        background: "var(--surface-soft)",
+                      }}
+                      disabled={loading}
+                    >
+                      Cancel edit
+                    </button>
+                  )}
+                </div>
               </div>
 
               <motion.button
                 onClick={handleMediaItemSave}
-                disabled={!mediaForm.file || loading}
+                disabled={loading || (!editingMediaItem && !mediaForm.file)}
                 className="w-full px-4 py-3 rounded-lg text-base md:text-lg font-medium transition-all duration-300 relative overflow-hidden"
                 style={{
                   background: "var(--accent)",
                   color: "white",
                 }}
-                whileHover={{ scale: !mediaForm.file || loading ? 1 : 1.02 }}
-                whileTap={{ scale: !mediaForm.file || loading ? 1 : 0.98 }}
+                whileHover={{
+                  scale:
+                    loading || (!editingMediaItem && !mediaForm.file) ? 1 : 1.02,
+                }}
+                whileTap={{
+                  scale:
+                    loading || (!editingMediaItem && !mediaForm.file) ? 1 : 0.98,
+                }}
               >
                 {loading && uploadProgress > 0 && (
                   <div
@@ -2965,8 +3027,17 @@ export default function StudioManagementPage() {
                   </span>
                 ) : (
                   <span className="flex items-center justify-center gap-3 relative z-10">
-                    <Plus className="w-5 h-5" />
-                    Add Media Item
+                    {editingMediaItem ? (
+                      <>
+                        <Edit className="w-5 h-5" />
+                        Save Changes
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-5 h-5" />
+                        Add Media Item
+                      </>
+                    )}
                   </span>
                 )}
               </motion.button>
@@ -3031,17 +3102,66 @@ export default function StudioManagementPage() {
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300">
                             <div className="absolute bottom-4 left-4 right-4">
                               <div className="flex items-center justify-between">
-                                <span className="text-white text-sm font-medium bg-slate-900/70 backdrop-blur-sm px-3 py-1 rounded-full">
-                                  {item.media_type}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-white text-sm font-medium bg-slate-900/70 backdrop-blur-sm px-3 py-1 rounded-full">
+                                    {item.media_type}
+                                  </span>
+                                  <span
+                                    className={`text-white text-xs font-semibold px-2.5 py-1 rounded-full backdrop-blur-sm ${
+                                      item.is_active !== false
+                                        ? "bg-green-600/70"
+                                        : "bg-gray-700/70"
+                                    }`}
+                                  >
+                                    {item.is_active !== false ? "Active" : "Hidden"}
+                                  </span>
+                                </div>
+                                <motion.button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startMediaItemEdit(item);
+                                  }}
+                                  className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center"
+                                  whileHover={{ scale: 1.08 }}
+                                  whileTap={{ scale: 0.95 }}
+                                >
+                                  <Edit size={14} className="text-white" />
+                                </motion.button>
+                                <motion.button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      await updateMediaItem(item.id, {
+                                        is_active: !(item.is_active !== false),
+                                      });
+                                      loadData();
+                                      toast.success(
+                                        item.is_active !== false
+                                          ? "Media item hidden"
+                                          : "Media item activated"
+                                      );
+                                    } catch (error) {
+                                      notifyError(error, "Failed to update media item");
+                                    }
+                                  }}
+                                  className="ml-2 w-8 h-8 bg-slate-900/40 backdrop-blur-sm rounded-full flex items-center justify-center"
+                                  whileHover={{ scale: 1.08 }}
+                                  whileTap={{ scale: 0.95 }}
+                                >
+                                  {item.is_active !== false ? (
+                                    <EyeOff size={14} className="text-white" />
+                                  ) : (
+                                    <Eye size={14} className="text-white" />
+                                  )}
+                                </motion.button>
                                 <motion.button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleMediaItemDelete(item);
                                   }}
-                                  className="w-8 h-8 bg-red-500/80 backdrop-blur-sm rounded-full flex items-center justify-center"
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.9 }}
+                                  className="ml-2 w-8 h-8 bg-red-500/80 backdrop-blur-sm rounded-full flex items-center justify-center"
+                                  whileHover={{ scale: 1.08 }}
+                                  whileTap={{ scale: 0.95 }}
                                 >
                                   <Trash2 size={14} className="text-white" />
                                 </motion.button>

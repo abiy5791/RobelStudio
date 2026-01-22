@@ -11,6 +11,59 @@ class ImageProcessor:
     FULL_SIZE = (2400, 2400)
     QUALITY = 85
     WEBP_QUALITY = 80
+
+    @staticmethod
+    def _open_and_normalize(image_file):
+        """Open an uploaded image and normalize orientation/color mode."""
+        try:
+            try:
+                image_file.seek(0)
+            except Exception:
+                pass
+
+            img = Image.open(image_file)
+
+            # Convert RGBA to RGB if needed
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            # Auto-rotate based on EXIF
+            try:
+                from PIL import ImageOps
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass
+
+            return img
+        except Exception as e:
+            raise Exception(f"Image open/normalize failed: {str(e)}")
+
+    @staticmethod
+    def process_full_image(image_file, filename, *, max_size=None, quality=None, suffix='full'):
+        """Process image and return a single WebP ContentFile (default: full size).
+
+        This is intended for non-album uploads where we want only one optimized image.
+        """
+        try:
+            img = ImageProcessor._open_and_normalize(image_file)
+
+            target_size = max_size or ImageProcessor.FULL_SIZE
+            target_quality = ImageProcessor.QUALITY if quality is None else quality
+
+            base_name = os.path.splitext(filename)[0]
+            out = img.copy()
+            out.thumbnail(target_size, Image.Resampling.LANCZOS)
+            out_io = BytesIO()
+            out.save(out_io, format='WEBP', quality=target_quality, optimize=True)
+            return ContentFile(out_io.getvalue(), name=f"{base_name}_{suffix}.webp")
+        except Exception as e:
+            raise Exception(f"Image processing failed: {str(e)}")
     
     @staticmethod
     def process_image(image_file, filename):

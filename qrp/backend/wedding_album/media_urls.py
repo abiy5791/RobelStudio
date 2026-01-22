@@ -5,6 +5,13 @@ from django.views.decorators.http import require_http_methods
 import os
 import mimetypes
 
+# Ensure modern image/video types resolve correctly even on hosts
+# where the system mimetypes database is incomplete.
+mimetypes.add_type('image/webp', '.webp')
+mimetypes.add_type('image/avif', '.avif')
+mimetypes.add_type('video/mp4', '.mp4')
+mimetypes.add_type('video/webm', '.webm')
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def serve_media(request, path):

@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import zipfile
 from django.conf import settings
@@ -15,6 +16,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from urllib.parse import urlparse
 
@@ -51,6 +53,12 @@ from .serializers import (
 )
 from .permissions import IsOwnerOrReadOnly, IsAuthenticatedOrReadOnly
 from .image_processor import ImageProcessor
+
+
+def _safe_stem(filename: str) -> str:
+    stem = os.path.splitext(os.path.basename(filename or ''))[0]
+    stem = re.sub(r'[^A-Za-z0-9_-]+', '-', stem).strip('-')
+    return (stem or 'image')[:80]
 
 
 class AlbumPagination(PageNumberPagination):
@@ -342,8 +350,10 @@ class BulkUploadPortfolioImagesView(APIView):
         
         created_images = []
         for idx, image in enumerate(images):
+            safe_name = f"portfolio-{int(time.time() * 1000)}-{idx}-{_safe_stem(getattr(image, 'name', 'image'))}"
+            optimized = ImageProcessor.process_full_image(image, safe_name)
             portfolio_image = PortfolioImage.objects.create(
-                image=image,
+                image=optimized,
                 category=category,
                 order=last_order + idx + 1
             )
@@ -383,9 +393,11 @@ class BulkUploadServiceImagesView(APIView):
         
         created_images = []
         for idx, image in enumerate(images):
+            safe_name = f"service-{service.id}-{int(time.time() * 1000)}-{idx}-{_safe_stem(getattr(image, 'name', 'image'))}"
+            optimized = ImageProcessor.process_full_image(image, safe_name)
             gallery_image = ServiceGalleryImage.objects.create(
                 service=service,
-                image=image,
+                image=optimized,
                 order=last_order + idx + 1
             )
             created_images.append(gallery_image)
@@ -409,10 +421,10 @@ class StudioContentManageView(generics.RetrieveUpdateAPIView):
         if created:
             # Create default stats
             StudioStat.objects.bulk_create([
-                StudioStat(content=obj, label='Happy Clients', value='1K+', icon='FiUsers', order=1),
-                StudioStat(content=obj, label='Years Experience', value='6+', icon='FiCamera', order=2),
-                StudioStat(content=obj, label='Awards Won', value='50+', icon='FiAward', order=3),
-                StudioStat(content=obj, label='Moments Captured', value='1000+', icon='FiHeart', order=4),
+                StudioStat(content=obj, label='Happy Clients', value='0', icon='FiUsers', order=1),
+                StudioStat(content=obj, label='Years Experience', value='0', icon='FiCamera', order=2),
+                StudioStat(content=obj, label='Awards Won', value='0', icon='FiAward', order=3),
+                StudioStat(content=obj, label='Moments Captured', value='0', icon='FiHeart', order=4),
             ])
         return obj
     
@@ -589,7 +601,16 @@ class TestimonialManageView(generics.ListCreateAPIView):
         return {'request': self.request}
 
     def perform_create(self, serializer):
-        serializer.save()
+        avatar = serializer.validated_data.get('avatar')
+        if avatar:
+            try:
+                safe_name = f"testimonial-{int(time.time() * 1000)}-{_safe_stem(getattr(avatar, 'name', 'avatar'))}"
+                optimized = ImageProcessor.process_full_image(avatar, safe_name, quality=ImageProcessor.WEBP_QUALITY, suffix='avatar')
+                serializer.save(avatar=optimized)
+            except Exception as e:
+                raise ValidationError({'avatar': f'Failed to process avatar: {str(e)}'})
+        else:
+            serializer.save()
         cache.delete('studio_data')
 
 
@@ -609,7 +630,16 @@ class TestimonialDetailManageView(generics.RetrieveUpdateDestroyAPIView):
         return {'request': self.request}
     
     def perform_update(self, serializer):
-        serializer.save()
+        avatar = serializer.validated_data.get('avatar')
+        if avatar:
+            try:
+                safe_name = f"testimonial-{serializer.instance.id}-{int(time.time() * 1000)}-{_safe_stem(getattr(avatar, 'name', 'avatar'))}"
+                optimized = ImageProcessor.process_full_image(avatar, safe_name, quality=ImageProcessor.WEBP_QUALITY, suffix='avatar')
+                serializer.save(avatar=optimized)
+            except Exception as e:
+                raise ValidationError({'avatar': f'Failed to process avatar: {str(e)}'})
+        else:
+            serializer.save()
         cache.delete('studio_data')
     
     def perform_destroy(self, instance):
@@ -680,7 +710,16 @@ class PortfolioImageDetailManageView(generics.RetrieveUpdateDestroyAPIView):
         return PortfolioImage.objects.all()
 
     def perform_update(self, serializer):
-        serializer.save()
+        image = serializer.validated_data.get('image')
+        if image:
+            try:
+                safe_name = f"portfolio-{serializer.instance.id}-{int(time.time() * 1000)}-{_safe_stem(getattr(image, 'name', 'image'))}"
+                optimized = ImageProcessor.process_full_image(image, safe_name)
+                serializer.save(image=optimized)
+            except Exception as e:
+                raise ValidationError({'image': f'Failed to process image: {str(e)}'})
+        else:
+            serializer.save()
         cache.delete('studio_data')
 
     def perform_destroy(self, instance):
@@ -711,7 +750,16 @@ class ServiceGalleryImageDetailManageView(generics.RetrieveUpdateDestroyAPIView)
     queryset = ServiceGalleryImage.objects.all()
 
     def perform_update(self, serializer):
-        serializer.save()
+        image = serializer.validated_data.get('image')
+        if image:
+            try:
+                safe_name = f"service-gallery-{serializer.instance.id}-{int(time.time() * 1000)}-{_safe_stem(getattr(image, 'name', 'image'))}"
+                optimized = ImageProcessor.process_full_image(image, safe_name)
+                serializer.save(image=optimized)
+            except Exception as e:
+                raise ValidationError({'image': f'Failed to process image: {str(e)}'})
+        else:
+            serializer.save()
         cache.delete('studio_data')
 
     def perform_destroy(self, instance):
@@ -766,7 +814,22 @@ class VideoManageView(generics.ListCreateAPIView):
         return {'request': self.request}
 
     def perform_create(self, serializer):
-        serializer.save()
+        thumbnail = serializer.validated_data.get('thumbnail')
+        if thumbnail:
+            try:
+                safe_name = f"video-thumb-{int(time.time() * 1000)}-{_safe_stem(getattr(thumbnail, 'name', 'thumbnail'))}"
+                optimized = ImageProcessor.process_full_image(
+                    thumbnail,
+                    safe_name,
+                    max_size=ImageProcessor.MEDIUM_SIZE,
+                    quality=ImageProcessor.WEBP_QUALITY,
+                    suffix='thumb',
+                )
+                serializer.save(thumbnail=optimized)
+            except Exception as e:
+                raise ValidationError({'thumbnail': f'Failed to process thumbnail: {str(e)}'})
+        else:
+            serializer.save()
         cache.delete('studio_data')
 
 
@@ -786,7 +849,22 @@ class VideoDetailManageView(generics.RetrieveUpdateDestroyAPIView):
         return {'request': self.request}
 
     def perform_update(self, serializer):
-        serializer.save()
+        thumbnail = serializer.validated_data.get('thumbnail')
+        if thumbnail:
+            try:
+                safe_name = f"video-thumb-{serializer.instance.id}-{int(time.time() * 1000)}-{_safe_stem(getattr(thumbnail, 'name', 'thumbnail'))}"
+                optimized = ImageProcessor.process_full_image(
+                    thumbnail,
+                    safe_name,
+                    max_size=ImageProcessor.MEDIUM_SIZE,
+                    quality=ImageProcessor.WEBP_QUALITY,
+                    suffix='thumb',
+                )
+                serializer.save(thumbnail=optimized)
+            except Exception as e:
+                raise ValidationError({'thumbnail': f'Failed to process thumbnail: {str(e)}'})
+        else:
+            serializer.save()
         cache.delete('studio_data')
 
     def perform_destroy(self, instance):
@@ -823,11 +901,25 @@ class BulkUploadVideosView(APIView):
         for idx, video_file in enumerate(videos):
             thumbnail_file = thumbnails[idx] if idx < len(thumbnails) else None
 
+            optimized_thumb = None
+            if thumbnail_file:
+                try:
+                    safe_name = f"video-thumb-{category.id}-{int(time.time() * 1000)}-{idx}-{_safe_stem(getattr(thumbnail_file, 'name', 'thumbnail'))}"
+                    optimized_thumb = ImageProcessor.process_full_image(
+                        thumbnail_file,
+                        safe_name,
+                        max_size=ImageProcessor.MEDIUM_SIZE,
+                        quality=ImageProcessor.WEBP_QUALITY,
+                        suffix='thumb',
+                    )
+                except Exception as e:
+                    raise ValidationError({'thumbnails': f'Failed to process thumbnail {idx}: {str(e)}'})
+
             video = Video.objects.create(
                 title=f"{video_file.name.split('.')[0]} - {idx + 1}",
                 category=category,
                 video_file=video_file,
-                thumbnail=thumbnail_file,
+                thumbnail=optimized_thumb,
                 order=last_order + idx + 1
             )
             created_videos.append(video)
@@ -856,7 +948,21 @@ class MediaItemManageView(generics.ListCreateAPIView):
         return {'request': self.request}
 
     def perform_create(self, serializer):
-        serializer.save()
+        media_type = serializer.validated_data.get('media_type', 'image')
+        file_obj = serializer.validated_data.get('file')
+        save_kwargs = {}
+        # If client didn't explicitly send is_active, default to visible.
+        if 'is_active' not in serializer.validated_data:
+            save_kwargs['is_active'] = True
+        if file_obj and media_type == 'image':
+            try:
+                safe_name = f"hero-media-{int(time.time() * 1000)}-{_safe_stem(getattr(file_obj, 'name', 'media'))}"
+                optimized = ImageProcessor.process_full_image(file_obj, safe_name)
+                serializer.save(file=optimized, **save_kwargs)
+            except Exception as e:
+                raise ValidationError({'file': f'Failed to process image: {str(e)}'})
+        else:
+            serializer.save(**save_kwargs)
         cache.delete('studio_data')
 
 
@@ -876,7 +982,17 @@ class MediaItemDetailManageView(generics.RetrieveUpdateDestroyAPIView):
         return {'request': self.request}
     
     def perform_update(self, serializer):
-        serializer.save()
+        effective_media_type = serializer.validated_data.get('media_type', getattr(serializer.instance, 'media_type', 'image'))
+        file_obj = serializer.validated_data.get('file')
+        if file_obj and effective_media_type == 'image':
+            try:
+                safe_name = f"hero-media-{serializer.instance.id}-{int(time.time() * 1000)}-{_safe_stem(getattr(file_obj, 'name', 'media'))}"
+                optimized = ImageProcessor.process_full_image(file_obj, safe_name)
+                serializer.save(file=optimized)
+            except Exception as e:
+                raise ValidationError({'file': f'Failed to process image: {str(e)}'})
+        else:
+            serializer.save()
         cache.delete('studio_data')
     
     def perform_destroy(self, instance):
