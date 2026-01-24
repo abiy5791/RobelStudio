@@ -14,6 +14,7 @@ import EditAlbumPage from './pages/EditAlbumPage'
 import StudioManagementPage from './pages/StudioManagementPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { applyTheme, removeTheme } from './themes/categories'
+import DeveloperCredit from './components/DeveloperCredit'
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -132,6 +133,7 @@ function AppContent({ dark, toggleTheme, isAlbumPage }) {
               </div>
               <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6 text-xs md:text-sm font-sans" style={{ color: 'var(--text-soft)' }}>
                 <span>© {new Date().getFullYear()} Robel Studio</span>
+                <DeveloperCredit />
                 <div className="flex items-center gap-4 md:gap-6">
                   <a className="hover:opacity-70 transition-opacity" href="#">Privacy</a>
                   <a className="hover:opacity-70 transition-opacity" href="#">Terms</a>
