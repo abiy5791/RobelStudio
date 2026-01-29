@@ -18,7 +18,7 @@ jobs:
 
       - name: Build and push backend image
         run: |
-          docker build ./backend --tag ghcr.io/${{ github.repository_owner }}/robelstudio:backend-latest
+          docker build ./qrp/backend --tag ghcr.io/${{ github.repository_owner }}/robelstudio:backend-latest
           docker push ghcr.io/${{ github.repository_owner }}/robelstudio:backend-latest
 
       # - name: Build and push frontend image
