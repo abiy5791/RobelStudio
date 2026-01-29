@@ -133,10 +133,12 @@ else:
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://album-blush.vercel.app",
-    "https://album-o6l3.vercel.app"
+    origin.strip()
+    for origin in os.environ.get(
+        'DJANGO_CORS_ALLOWED_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173,https://album-blush.vercel.app,https://album-o6l3.vercel.app'
+    ).split(',')
+    if origin.strip()
 ]
 
 # CSRF Trusted Origins
