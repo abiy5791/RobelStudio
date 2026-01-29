@@ -38,10 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /install /usr/local
 COPY . .
 
-# Optional: collectstatic if needed
-RUN python manage.py collectstatic --noinput
-
 EXPOSE 8000
 
 # Use the full path for gunicorn to ensure it's picked up
-CMD ["gunicorn", "--workers", "3", "--timeout", "120", "--bind", "0.0.0.0:8000", "wedding_album.wsgi:application"]
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && gunicorn --workers 3 --timeout 120 --bind 0.0.0.0:8000 wedding_album.wsgi:application"]
