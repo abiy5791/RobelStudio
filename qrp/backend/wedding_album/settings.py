@@ -116,6 +116,10 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = os.environ.get('DJANGO_SECURE_BROWSER_XSS_FILTER', 'true').lower() == 'true'
     SECURE_CONTENT_TYPE_NOSNIFF = os.environ.get('DJANGO_SECURE_CONTENT_TYPE_NOSNIFF', 'true').lower() == 'true'
     X_FRAME_OPTIONS = os.environ.get('DJANGO_X_FRAME_OPTIONS', 'DENY')
+    
+    # Additional SSL settings
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_TLS = True
 
 # Static files via WhiteNoise (recommended for Docker; can be enabled in dev too)
 if os.environ.get('DJANGO_USE_WHITENOISE', 'true' if not DEBUG else 'false').lower() == 'true':
