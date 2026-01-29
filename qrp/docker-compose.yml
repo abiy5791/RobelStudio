@@ -89,9 +89,41 @@ services:
     networks:
       - db-network
 
+  umami-db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=${UMAMI_DB_NAME}
+      - POSTGRES_USER=${UMAMI_DB_USER}
+      - POSTGRES_PASSWORD=${UMAMI_DB_PASSWORD}
+    volumes:
+      - umami-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - umami-network
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    environment:
+      - DATABASE_URL=postgresql://${UMAMI_DB_USER:-umami}:${UMAMI_DB_PASSWORD}@umami-db:5432/${UMAMI_DB_NAME:-umami}
+      - DATABASE_TYPE=postgresql
+      - APP_SECRET=${UMAMI_APP_SECRET}
+      - HASH_SALT=${UMAMI_HASH_SALT}
+    depends_on:
+      - umami-db
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - umami-network
+
 networks:
   app-network:
     driver: bridge
   db-network:
     driver: bridge
+  umami-network:
+    driver: bridge
+
+volumes:
+  umami-data:
 
