@@ -139,6 +139,16 @@ CORS_ALLOWED_ORIGINS = [
     "https://album-o6l3.vercel.app"
 ]
 
+# CSRF Trusted Origins
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        'DJANGO_CSRF_TRUSTED_ORIGINS',
+        'https://api.robelstudio.com,https://robel-studio.vercel.app'
+    ).split(',')
+    if origin.strip()
+]
+
 # CORS: in dev allow-all is convenient; in prod default to allow-list.
 CORS_ALLOW_ALL_ORIGINS = os.environ.get(
     'DJANGO_CORS_ALLOW_ALL_ORIGINS',

@@ -31,7 +31,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - SECRET_KEY=${SECRET_KEY}
       - DEBUG=${DEBUG:-False}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - DJANGO_ALLOWED_HOSTS=${ALLOWED_HOSTS}
       - EMAIL_HOST=${EMAIL_HOST}
       - EMAIL_PORT=${EMAIL_PORT}
       - EMAIL_USE_TLS=${EMAIL_USE_TLS}
@@ -44,6 +44,7 @@ services:
       - DEBUG=False
       - SECURE_SSL_REDIRECT=true
       - USE_HTTPS=true
+      - DJANGO_CSRF_TRUSTED_ORIGINS=${DJANGO_CSRF_TRUSTED_ORIGINS}
     depends_on:
       - db
     restart: unless-stopped
