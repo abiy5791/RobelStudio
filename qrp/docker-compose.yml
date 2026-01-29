@@ -17,6 +17,7 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+      - umami-network
 
   backend:
     build:
