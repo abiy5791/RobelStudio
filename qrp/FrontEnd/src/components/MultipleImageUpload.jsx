@@ -71,7 +71,7 @@ const MultipleImageUpload = ({ onUploadComplete, uploadFunction, categoryId, ser
           formData.append('service_id', serviceId);
         }
 
-        const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+        const API_BASE = import.meta.env.VITE_API_BASE || '';
         const endpoint = categoryId ? `${API_BASE}/api/uploads/portfolio/` : `${API_BASE}/api/uploads/service/`;
         const response = await fetch(endpoint, {
           method: 'POST',

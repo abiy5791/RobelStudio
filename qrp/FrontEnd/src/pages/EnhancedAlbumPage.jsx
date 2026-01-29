@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -14,6 +14,7 @@ import {
   FiMail,
   FiPhone,
   FiMapPin,
+  FiLink,
   FiSun,
   FiMoon,
 } from "react-icons/fi";
@@ -39,6 +40,94 @@ import {
   getThemeColors,
 } from "../themes/categories";
 import ParticleSystem from "../components/ParticleSystem";
+import DeveloperCredit from "../components/DeveloperCredit.jsx";
+
+const DEFAULT_SOCIAL_LINKS = [
+  {
+    platform: "Instagram",
+    icon: "FiInstagram",
+    url: "https://www.instagram.com/robel_studioet/",
+  },
+  {
+    platform: "Facebook",
+    icon: "FiFacebook",
+    url: "https://web.facebook.com/robelstudiophotandvideo?_rdc=1&_rdr#",
+  },
+  {
+    platform: "TikTok",
+    icon: "FaTiktok",
+    url: "https://www.tiktok.com/@robelstudio",
+  },
+  {
+    platform: "Maps",
+    icon: "FiMapPin",
+    url: "https://maps.app.goo.gl/2vjswew27ztyZAy1A",
+  },
+  {
+    platform: "Email",
+    icon: "FiMail",
+    url: "mailto:robelasrat22@gmail.com",
+  },
+];
+
+const SOCIAL_ICON_LIBRARY = {
+  FiInstagram,
+  FiFacebook,
+  FiMail,
+  FiPhone,
+  FiMapPin,
+  FiLink,
+  FaTiktok,
+};
+
+const SOCIAL_ICON_KEYWORD_MAP = [
+  { keywords: ["instagram", "ig"], icon: FiInstagram },
+  { keywords: ["facebook", "meta"], icon: FiFacebook },
+  { keywords: ["tiktok"], icon: FaTiktok },
+  { keywords: ["map", "location", "pin", "address"], icon: FiMapPin },
+  { keywords: ["mail", "email"], icon: FiMail },
+  { keywords: ["phone", "call"], icon: FiPhone },
+];
+
+const resolveSocialIconComponent = (iconKey, platformLabel) => {
+  const normalizedKey = iconKey?.trim();
+  if (normalizedKey) {
+    const candidates = [normalizedKey];
+
+    const pascalKey =
+      normalizedKey.length > 1
+        ? normalizedKey[0].toUpperCase() + normalizedKey.slice(1)
+        : normalizedKey.toUpperCase();
+
+    candidates.push(pascalKey);
+
+    if (!normalizedKey.startsWith("Fi") && !normalizedKey.startsWith("Fa")) {
+      candidates.push(`Fi${pascalKey}`);
+      candidates.push(`Fa${pascalKey}`);
+    }
+
+    for (const candidate of candidates) {
+      if (SOCIAL_ICON_LIBRARY[candidate]) {
+        return SOCIAL_ICON_LIBRARY[candidate];
+      }
+    }
+  }
+
+  const normalizedLabel = platformLabel
+    ? platformLabel.toLowerCase().trim()
+    : "";
+  if (normalizedLabel) {
+    for (const entry of SOCIAL_ICON_KEYWORD_MAP) {
+      if (entry.keywords.some((keyword) => normalizedLabel.includes(keyword))) {
+        return entry.icon;
+      }
+    }
+  }
+
+  return FiLink;
+};
+
+const sanitizePhoneValue = (value = "") => value.replace(/[^+0-9]/g, "");
 
 export default function EnhancedAlbumPage() {
   const { slug } = useParams();
@@ -53,7 +142,7 @@ export default function EnhancedAlbumPage() {
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("album-theme");
       const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
+        "(prefers-color-scheme: dark)",
       ).matches;
       return savedTheme === "dark" || (!savedTheme && prefersDark);
     }
@@ -73,15 +162,21 @@ export default function EnhancedAlbumPage() {
       personal: "artistic",
     }[album?.category] || "petals";
 
-  // Apply theme when album loads
-  useEffect(() => {
-    if (album?.category) {
-      applyTheme(album.category, isDark);
+  // Keep <html class="dark"> + CSS variables in sync with state.
+  // useLayoutEffect avoids a visible "wrong theme" frame on reload.
+  useLayoutEffect(() => {
+    if (typeof document === "undefined") return;
+
+    document.documentElement.classList.toggle("dark", isDark);
+    try {
+      localStorage.setItem("album-theme", isDark ? "dark" : "light");
+    } catch {
+      // ignore storage errors (private mode / disabled storage)
     }
-    return () => {
-      // Clean up theme when component unmounts
-      // removeTheme(); // Uncomment if you want to remove theme on unmount
-    };
+
+    // Apply theme variables even before the album loads, so we don't inherit
+    // stale vars from a previous page/theme.
+    applyTheme(album?.category || "weddings", isDark);
   }, [album?.category, isDark]);
 
   useEffect(() => {
@@ -112,20 +207,87 @@ export default function EnhancedAlbumPage() {
       .catch((err) => console.error("Failed to load studio data:", err));
   }, []);
 
+  const contactInfo = studioData?.contact_info;
+
+  const resolvedSocialLinks = useMemo(() => {
+    if (!Array.isArray(studioData?.social_links)) {
+      return [];
+    }
+    return [...studioData.social_links]
+      .filter((link) => link && link.is_active !== false && link.url)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [studioData?.social_links]);
+
+  const socialLinksForDisplay =
+    resolvedSocialLinks.length > 0 ? resolvedSocialLinks : DEFAULT_SOCIAL_LINKS;
+
+  const socialLinksForFooter = useMemo(() => {
+    const filtered = socialLinksForDisplay.filter((link) => {
+      const label = (link.platform || link.label || link.name || "")
+        .toString()
+        .toLowerCase()
+        .trim();
+      return !["maps", "map", "email"].includes(label);
+    });
+
+    return (filtered.length > 0 ? filtered : socialLinksForDisplay).slice(0, 4);
+  }, [socialLinksForDisplay]);
+
+  const contactMethods = useMemo(() => {
+    const fallback = {
+      phone: "+251 911 199 762",
+      email: "robelasrat22@gmail.com",
+      address: "Addis Ababa, Ethiopia",
+      mapUrl: "https://maps.app.goo.gl/2vjswew27ztyZAy1A",
+    };
+
+    const phone = contactInfo?.phone || fallback.phone;
+    const email = contactInfo?.email || fallback.email;
+    const address = contactInfo?.address || fallback.address;
+
+    const mapsFromSocial = socialLinksForDisplay.find((link) => {
+      const label = (link.platform || link.label || link.name || "")
+        .toString()
+        .toLowerCase();
+      return label.includes("map");
+    })?.url;
+
+    const mapUrl =
+      contactInfo?.map_url ||
+      contactInfo?.maps_url ||
+      contactInfo?.google_maps_url ||
+      mapsFromSocial ||
+      fallback.mapUrl;
+
+    return [
+      {
+        key: "phone",
+        title: "Call Us",
+        icon: FiPhone,
+        value: phone,
+        href: `tel:${sanitizePhoneValue(phone)}`,
+      },
+      {
+        key: "email",
+        title: "Email Us",
+        icon: FiMail,
+        value: email,
+        href: `mailto:${email}`,
+      },
+      {
+        key: "address",
+        title: "Visit Us",
+        icon: FiMapPin,
+        value: address,
+        href: mapUrl,
+        external: true,
+      },
+    ];
+  }, [contactInfo, socialLinksForDisplay]);
+
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  const toggleTheme = () => {
-    const newDarkMode = !isDarkMode;
-    setIsDarkMode(newDarkMode);
-
-    if (newDarkMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("album-theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("album-theme", "light");
-    }
-  };
+  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   const handlePhotoLike = async (photoId) => {
     setAlbum((prev) => ({
@@ -156,7 +318,7 @@ export default function EnhancedAlbumPage() {
                 likes_count: result.likes_count,
                 is_liked: result.liked,
               }
-            : photo
+            : photo,
         ),
       }));
     } catch (err) {
@@ -245,6 +407,7 @@ export default function EnhancedAlbumPage() {
           type={particleType}
           count={50}
           category={album?.category || "weddings"}
+          isDarkMode={isDark}
         />
       </div>
 
@@ -403,14 +566,14 @@ export default function EnhancedAlbumPage() {
               {album?.category === "weddings"
                 ? "A Love Story Captured"
                 : album?.category === "family"
-                ? "Family Memories Preserved"
-                : album?.category === "celebrations"
-                ? "Celebration Moments"
-                : album?.category === "travel"
-                ? "Adventure Documented"
-                : album?.category === "special"
-                ? "Special Moments Remembered"
-                : "Creative Journey Shared"}
+                  ? "Family Memories Preserved"
+                  : album?.category === "celebrations"
+                    ? "Celebration Moments"
+                    : album?.category === "travel"
+                      ? "Adventure Documented"
+                      : album?.category === "special"
+                        ? "Special Moments Remembered"
+                        : "Creative Journey Shared"}
             </motion.p>
 
             {album?.description && (
@@ -463,7 +626,7 @@ export default function EnhancedAlbumPage() {
             >
               {album?.photos?.map((photo, i) => {
                 const photoUrl = getImageUrl(
-                  typeof photo === "string" ? photo : photo.url
+                  typeof photo === "string" ? photo : photo.url,
                 );
                 const thumbnailUrl =
                   typeof photo === "object" && photo.thumbnail_url
@@ -572,14 +735,14 @@ export default function EnhancedAlbumPage() {
                 {album?.category === "weddings"
                   ? "Leave Your Wishes"
                   : album?.category === "family"
-                  ? "Share Your Thoughts"
-                  : album?.category === "celebrations"
-                  ? "Celebration Messages"
-                  : album?.category === "travel"
-                  ? "Travel Comments"
-                  : album?.category === "special"
-                  ? "Special Messages"
-                  : "Creative Feedback"}
+                    ? "Share Your Thoughts"
+                    : album?.category === "celebrations"
+                      ? "Celebration Messages"
+                      : album?.category === "travel"
+                        ? "Travel Comments"
+                        : album?.category === "special"
+                          ? "Special Messages"
+                          : "Creative Feedback"}
               </h2>
               <div className="flex items-center justify-center gap-2 mb-4">
                 <div
@@ -612,14 +775,14 @@ export default function EnhancedAlbumPage() {
                 {album?.category === "weddings"
                   ? "Share your love and congratulations with the happy couple"
                   : album?.category === "family"
-                  ? "Share your thoughts about these precious family moments"
-                  : album?.category === "celebrations"
-                  ? "Leave your celebration wishes and memories"
-                  : album?.category === "travel"
-                  ? "Share your thoughts about this amazing journey"
-                  : album?.category === "special"
-                  ? "Leave your congratulations and well wishes"
-                  : "Share your creative feedback and inspiration"}
+                    ? "Share your thoughts about these precious family moments"
+                    : album?.category === "celebrations"
+                      ? "Leave your celebration wishes and memories"
+                      : album?.category === "travel"
+                        ? "Share your thoughts about this amazing journey"
+                        : album?.category === "special"
+                          ? "Leave your congratulations and well wishes"
+                          : "Share your creative feedback and inspiration"}
               </p>
             </div>
 
@@ -826,10 +989,7 @@ export default function EnhancedAlbumPage() {
                       className="text-2xl md:text-3xl font-semibold"
                       style={{
                         fontFamily: "'Kaushan Script', cursive",
-                        background: `linear-gradient(135deg, ${themeColors.primary} 0%, ${themeColors.accent} 100%)`,
-                        WebkitBackgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                        backgroundClip: "text",
+                        color: themeColors.text,
                       }}
                     >
                       Robel Studio
@@ -884,147 +1044,78 @@ export default function EnhancedAlbumPage() {
                 transition={{ duration: 0.3 }}
               >
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-                  <motion.a
-                    href="tel:+251911199762"
-                    className="flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl hover:bg-white/5 transition-colors"
-                    whileHover={{ scale: 1.05 }}
-                  >
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-600/20 rounded-xl flex items-center justify-center text-pink-400">
-                      <FiPhone size={18} />
-                    </div>
-                    <div className="text-center">
-                      <div
-                        className="font-semibold text-sm md:text-base"
-                        style={{
-                          color: themeColors.text,
-                          fontFamily: theme.fonts.sans,
-                        }}
-                      >
-                        Call Us
+                  {contactMethods.map((method) => (
+                    <motion.a
+                      key={method.key}
+                      href={method.href || "#"}
+                      target={method.external ? "_blank" : undefined}
+                      rel={method.external ? "noopener noreferrer" : undefined}
+                      className="flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl hover:bg-white/5 transition-colors"
+                      whileHover={{ scale: 1.05 }}
+                    >
+                      <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-600/20 rounded-xl flex items-center justify-center text-pink-400">
+                        <method.icon size={18} />
                       </div>
-                      <div
-                        className="text-xs md:text-sm"
-                        style={{
-                          color: isDark
-                            ? themeColors.text + "B3"
-                            : themeColors.text + "70",
-                          fontFamily: theme.fonts.sans,
-                        }}
-                      >
-                        +251 911 199 762
+                      <div className="text-center">
+                        <div
+                          className="font-semibold text-sm md:text-base"
+                          style={{
+                            color: themeColors.text,
+                            fontFamily: theme.fonts.sans,
+                          }}
+                        >
+                          {method.title}
+                        </div>
+                        <div
+                          className="text-xs md:text-sm"
+                          style={{
+                            color: isDark
+                              ? themeColors.text + "B3"
+                              : themeColors.text + "70",
+                            fontFamily: theme.fonts.sans,
+                          }}
+                        >
+                          {method.value}
+                        </div>
                       </div>
-                    </div>
-                  </motion.a>
-
-                  <motion.a
-                    href="mailto:robelasrat22@gmail.com"
-                    className="flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl hover:bg-white/5 transition-colors"
-                    whileHover={{ scale: 1.05 }}
-                  >
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-600/20 rounded-xl flex items-center justify-center text-pink-400">
-                      <FiMail size={18} />
-                    </div>
-                    <div className="text-center">
-                      <div
-                        className="font-semibold text-sm md:text-base"
-                        style={{
-                          color: themeColors.text,
-                          fontFamily: theme.fonts.sans,
-                        }}
-                      >
-                        Email Us
-                      </div>
-                      <div
-                        className="text-xs md:text-sm"
-                        style={{
-                          color: isDark
-                            ? themeColors.text + "B3"
-                            : themeColors.text + "70",
-                          fontFamily: theme.fonts.sans,
-                        }}
-                      >
-                        robelasrat22@gmail.com
-                      </div>
-                    </div>
-                  </motion.a>
-
-                  <motion.a
-                    href="https://maps.app.goo.gl/2vjswew27ztyZAy1A"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl hover:bg-white/5 transition-colors"
-                    whileHover={{ scale: 1.05 }}
-                  >
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-600/20 rounded-xl flex items-center justify-center text-pink-400">
-                      <FiMapPin size={18} />
-                    </div>
-                    <div className="text-center">
-                      <div
-                        className="font-semibold text-sm md:text-base"
-                        style={{
-                          color: themeColors.text,
-                          fontFamily: theme.fonts.sans,
-                        }}
-                      >
-                        Visit Us
-                      </div>
-                      <div
-                        className="text-xs md:text-sm"
-                        style={{
-                          color: isDark
-                            ? themeColors.text + "B3"
-                            : themeColors.text + "70",
-                          fontFamily: theme.fonts.sans,
-                        }}
-                      >
-                        Addis Ababa, Ethiopia
-                      </div>
-                    </div>
-                  </motion.a>
+                    </motion.a>
+                  ))}
                 </div>
 
                 <div className="flex justify-center gap-3 md:gap-4">
-                  {[
-                    {
-                      Icon: FiInstagram,
-                      href: "https://www.instagram.com/robel_studioet/",
-                      label: "Instagram",
-                    },
-                    {
-                      Icon: FiFacebook,
-                      href: "https://web.facebook.com/robelstudiophotandvideo?_rdc=1&_rdr#",
-                      label: "Facebook",
-                    },
-                    {
-                      Icon: FaTiktok,
-                      href: "https://www.tiktok.com/@robelstudio",
-                      label: "TikTok",
-                    },
-                  ].map(({ Icon, href, label }) => (
-                    <motion.a
-                      key={label}
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-10 h-10 md:w-12 md:h-12 rounded-full border flex items-center justify-center transition-all duration-300 hover:scale-110"
-                      style={{
-                        borderColor: themeColors.primary + "40",
-                        color: themeColors.primary,
-                        backgroundColor: themeColors.primary + "10",
-                      }}
-                      whileHover={{
-                        backgroundColor: themeColors.primary + "20",
-                        scale: 1.1,
-                      }}
-                      aria-label={label}
-                    >
-                      <Icon size={18} />
-                    </motion.a>
-                  ))}
+                  {socialLinksForFooter.map((link) => {
+                    const label = link.platform || link.label || link.name || "Link";
+                    const Icon = resolveSocialIconComponent(link.icon, label);
+
+                    return (
+                      <motion.a
+                        key={`${label}-${link.url}`}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-10 h-10 md:w-12 md:h-12 rounded-full border flex items-center justify-center transition-all duration-300 hover:scale-110"
+                        style={{
+                          borderColor: themeColors.primary + "40",
+                          color: themeColors.primary,
+                          backgroundColor: themeColors.primary + "10",
+                        }}
+                        whileHover={{
+                          backgroundColor: themeColors.primary + "20",
+                          scale: 1.1,
+                        }}
+                        aria-label={label}
+                      >
+                        <Icon size={18} />
+                      </motion.a>
+                    );
+                  })}
                 </div>
               </motion.div>
             </motion.div>
           )}
+        </div>
+        <div className="mt-10 text-xs flex justify-center">
+          <DeveloperCredit />
         </div>
       </motion.section>
 

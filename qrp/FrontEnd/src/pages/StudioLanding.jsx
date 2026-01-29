@@ -39,6 +39,7 @@ import {
 import { FaTiktok, FaWhatsapp, FaYoutube } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
 import { fetchStudioData, submitContactMessage } from "../services/studioApi";
+import DeveloperCredit from "../components/DeveloperCredit";
 
 import { formatNumber } from "../utils/numberUtils";
 import { validateAlbumId } from "../utils/albumUtils";
@@ -3027,6 +3028,9 @@ export default function StudioLanding() {
             <p>
               © {new Date().getFullYear()} Robel Studio. All rights reserved.
             </p>
+            <div className="mt-2 text-xs flex justify-center">
+              <DeveloperCredit />
+            </div>
           </div>
         </div>
       </footer>

@@ -10,8 +10,14 @@ load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() == 'true'
-ALLOWED_HOSTS = os.environ.get(
-    'DJANGO_ALLOWED_HOSTS', 'abiy21.pythonanywhere.com,album-ryvc.onrender.com,localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        'DJANGO_ALLOWED_HOSTS',
+        'abiy21.pythonanywhere.com,album-ryvc.onrender.com,localhost,127.0.0.1'
+    ).split(',')
+    if host.strip()
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -104,17 +110,17 @@ CACHE_MIDDLEWARE_SECONDS = 300  # 5 minutes
 
 # Security settings for production
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
+    SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SECURE_SSL_REDIRECT', 'true').lower() == 'true'
+    SESSION_COOKIE_SECURE = os.environ.get('DJANGO_SESSION_COOKIE_SECURE', 'true').lower() == 'true'
+    CSRF_COOKIE_SECURE = os.environ.get('DJANGO_CSRF_COOKIE_SECURE', 'true').lower() == 'true'
+    SECURE_BROWSER_XSS_FILTER = os.environ.get('DJANGO_SECURE_BROWSER_XSS_FILTER', 'true').lower() == 'true'
+    SECURE_CONTENT_TYPE_NOSNIFF = os.environ.get('DJANGO_SECURE_CONTENT_TYPE_NOSNIFF', 'true').lower() == 'true'
+    X_FRAME_OPTIONS = os.environ.get('DJANGO_X_FRAME_OPTIONS', 'DENY')
 
-# Production media serving
-if not DEBUG:
-    # Use whitenoise for static files in production
-    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+# Static files via WhiteNoise (recommended for Docker; can be enabled in dev too)
+if os.environ.get('DJANGO_USE_WHITENOISE', 'true' if not DEBUG else 'false').lower() == 'true':
+    if 'whitenoise.middleware.WhiteNoiseMiddleware' not in MIDDLEWARE:
+        MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 else:
     # Also use whitenoise in development for consistency
@@ -129,9 +135,11 @@ CORS_ALLOWED_ORIGINS = [
     "https://album-o6l3.vercel.app"
 ]
 
-# Allow CORS for media files
-# Allow all origins in production for media files
-CORS_ALLOW_ALL_ORIGINS = not DEBUG
+# CORS: in dev allow-all is convenient; in prod default to allow-list.
+CORS_ALLOW_ALL_ORIGINS = os.environ.get(
+    'DJANGO_CORS_ALLOW_ALL_ORIGINS',
+    'true' if DEBUG else 'false'
+).lower() == 'true'
 CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
