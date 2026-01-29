@@ -3,6 +3,7 @@ services:
     build:
       context: ./nginx
       dockerfile: Dockerfile
+    image: ghcr.io/abiy5791/robelstudio:nginx-latest
     ports:
       - "80:80"
       - "443:443"
