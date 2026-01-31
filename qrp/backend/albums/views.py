@@ -129,6 +129,8 @@ class UploadImagesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
         files = request.FILES.getlist('files')
         if not files:
             return Response({'detail': 'No files provided'}, status=status.HTTP_400_BAD_REQUEST)
@@ -138,36 +140,37 @@ class UploadImagesView(APIView):
         target_dir = os.path.join(settings.MEDIA_ROOT, subdir)
         os.makedirs(target_dir, exist_ok=True)
 
+        def process_single_image(idx, f):
+            safe_name = f"{idx}-{_safe_stem(f.name)}"
+            processed = ImageProcessor.process_image(f, safe_name)
+            
+            thumb_path = os.path.join(target_dir, processed['thumbnail'].name)
+            medium_path = os.path.join(target_dir, processed['medium'].name)
+            full_path = os.path.join(target_dir, processed['full'].name)
+            
+            with open(thumb_path, 'wb') as dest:
+                dest.write(processed['thumbnail'].read())
+            with open(medium_path, 'wb') as dest:
+                dest.write(processed['medium'].read())
+            with open(full_path, 'wb') as dest:
+                dest.write(processed['full'].read())
+            
+            base_url = settings.MEDIA_URL + subdir.replace('\\', '/') + '/'
+            return {
+                'url': request.build_absolute_uri(base_url + processed['full'].name),
+                'thumbnail_url': request.build_absolute_uri(base_url + processed['thumbnail'].name),
+                'medium_url': request.build_absolute_uri(base_url + processed['medium'].name),
+            }
+
         results = []
-        for idx, f in enumerate(files):
-            try:
-                safe_name = f"{idx}-{os.path.splitext(f.name)[0]}"
-                
-                # Process image (compress, resize, convert to WebP)
-                processed = ImageProcessor.process_image(f, safe_name)
-                
-                # Save all versions
-                thumb_path = os.path.join(target_dir, processed['thumbnail'].name)
-                medium_path = os.path.join(target_dir, processed['medium'].name)
-                full_path = os.path.join(target_dir, processed['full'].name)
-                
-                with open(thumb_path, 'wb') as dest:
-                    dest.write(processed['thumbnail'].read())
-                with open(medium_path, 'wb') as dest:
-                    dest.write(processed['medium'].read())
-                with open(full_path, 'wb') as dest:
-                    dest.write(processed['full'].read())
-                
-                # Build URLs
-                base_url = settings.MEDIA_URL + subdir.replace('\\', '/') + '/'
-                results.append({
-                    'url': request.build_absolute_uri(base_url + processed['full'].name),
-                    'thumbnail_url': request.build_absolute_uri(base_url + processed['thumbnail'].name),
-                    'medium_url': request.build_absolute_uri(base_url + processed['medium'].name),
-                })
-            except Exception as e:
-                return Response({'detail': f'Failed to process image {idx}: {str(e)}'}, 
-                              status=status.HTTP_400_BAD_REQUEST)
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {executor.submit(process_single_image, idx, f): idx for idx, f in enumerate(files)}
+            for future in as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as e:
+                    return Response({'detail': f'Failed to process image: {str(e)}'}, 
+                                  status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'images': results}, status=status.HTTP_201_CREATED)
 
