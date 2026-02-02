@@ -8,8 +8,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from the backend .env file (if present)
 load_dotenv(BASE_DIR / '.env')
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-key')
-DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() == 'true'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or os.environ.get('SECRET_KEY', 'dev-secret-key')
+DEBUG = os.environ.get('DJANGO_DEBUG', os.environ.get('DEBUG', 'true')).lower() == 'true'
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
@@ -119,7 +119,15 @@ if not DEBUG:
     
     # Additional SSL settings
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
     USE_TLS = True
+
+# If HTTPS is enabled at the edge (nginx / load balancer) but the app sees plain HTTP
+# between proxy and Django, ensure Django still treats requests as secure.
+USE_HTTPS = os.environ.get('DJANGO_USE_HTTPS', os.environ.get('USE_HTTPS', '')).lower() == 'true'
+if USE_HTTPS and 'SECURE_PROXY_SSL_HEADER' not in globals():
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
 
 # Static files via WhiteNoise (recommended for Docker; can be enabled in dev too)
 if os.environ.get('DJANGO_USE_WHITENOISE', 'true' if not DEBUG else 'false').lower() == 'true':
